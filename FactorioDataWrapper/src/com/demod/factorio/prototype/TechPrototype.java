@@ -18,23 +18,22 @@ public class TechPrototype extends DataPrototype {
 		private final LuaValue lua;
 		private final String type;
 		private final double modifier;
+		private final Optional<String> recipe;
+		private final String key;
 
 		public Effect(LuaValue lua) {
 			this.lua = lua;
 			type = lua.get("type").tojstring();
 			LuaValue modifierLua = lua.get("modifier");
-			if (modifierLua.isnumber()) {
-				modifier = modifierLua.todouble();
-			} else {
-				modifier = 0;
-			}
-		}
-
-		public String getKey() {
-			if (type.equals("ammo-damage")) {
-				return type + "|" + lua.get("ammo_category").tojstring();
-			}
-			return type;
+			modifier = modifierLua.isnumber()
+					? modifierLua.todouble()
+					: 0;
+			recipe = this.type.equals("unlock-recipe")
+					? Optional.of(lua.get("recipe").tojstring())
+					: Optional.empty();
+			key = type.equals("ammo-damage")
+					? type + "|" + lua.get("ammo_category").tojstring()
+					: type;
 		}
 
 		public double getModifier() {
@@ -43,6 +42,14 @@ public class TechPrototype extends DataPrototype {
 
 		public String getType() {
 			return type;
+		}
+
+		private Optional<String> getRecipe() {
+			return recipe;
+		}
+
+		public String getKey() {
+			return key;
 		}
 
 		public LuaValue lua() {
@@ -91,12 +98,12 @@ public class TechPrototype extends DataPrototype {
 		time = unitLua.get("time").todouble();
 
 		for (Effect effect : getEffects()) {
-			if (effect.getType().equals("unlock-recipe")) {
-				String recipeName = effect.lua().get("recipe").tojstring();
+			Optional<String> recipe = effect.getRecipe();
+			recipe.ifPresent(recipeName -> {
 				if (!excludedRecipesAndItems.contains(recipeName)) {
 					recipeUnlocks.add(recipeName);
 				}
-			}
+			});
 		}
 
 		LuaValue maxLevelLua = lua.get("max_level");
