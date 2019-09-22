@@ -10,6 +10,7 @@ import java.util.function.IntUnaryOperator;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
+import com.demod.factorio.FactorioData;
 import com.demod.factorio.Utils;
 
 public class TechPrototype extends DataPrototype {
@@ -67,14 +68,15 @@ public class TechPrototype extends DataPrototype {
 	private final List<String> recipeUnlocks = new ArrayList<>();
 	private final Optional<String> maxLevel;
 	private final boolean maxLevelInfinite;
+	private final Optional<IntUnaryOperator> bonusCountFormula;
+	private final Optional<String> bonusCountFormulaVisual;
 
-	private boolean firstBonus;
+	private final boolean firstBonus;
+
 	private boolean bonus;
 	private List<TechPrototype> bonusGroup;
 	private String bonusName;
 	private int bonusLevel;
-	private Optional<IntUnaryOperator> bonusCountFormula = Optional.empty();
-	private Optional<String> bonusCountFormulaVisual = Optional.empty();
 
 	public TechPrototype(LuaTable lua, String name, String type, Set<String> excludedRecipesAndItems) {
 		super(lua, name, type);
@@ -115,7 +117,26 @@ public class TechPrototype extends DataPrototype {
 			maxLevel = Optional.empty();
 			maxLevelInfinite = false;
 		}
+		bonusCountFormulaVisual = calculateCountFormula(lua);
+		bonusCountFormula = bonusCountFormulaVisual.map(FactorioData::parseCountFormula);
+
+		firstBonus = calculateFirstBonus(name);
 	}
+
+	private Optional<String> calculateCountFormula(LuaTable lua) {
+		LuaValue countFormulaLua = lua.get("unit").get("count_formula");
+		if (!countFormulaLua.isnil()) {
+			String countFormulaString = countFormulaLua.tojstring();
+			return Optional.of(countFormulaString);
+		}
+
+		return Optional.empty();
+	}
+
+	private boolean calculateFirstBonus(String name) {
+		return (upgrade || maxLevelInfinite) && name.endsWith("-1");
+	}
+
 
 	public Optional<IntUnaryOperator> getBonusCountFormula() {
 		return bonusCountFormula;
@@ -194,12 +215,6 @@ public class TechPrototype extends DataPrototype {
 		this.bonus = bonus;
 	}
 
-	public void setBonusFormula(Optional<String> bonusCountFormulaVisual,
-			Optional<IntUnaryOperator> bonusCountFormula) {
-		this.bonusCountFormulaVisual = bonusCountFormulaVisual;
-		this.bonusCountFormula = bonusCountFormula;
-	}
-
 	public void setBonusGroup(List<TechPrototype> bonusGroup) {
 		this.bonusGroup = bonusGroup;
 	}
@@ -214,9 +229,5 @@ public class TechPrototype extends DataPrototype {
 
 	public void setCount(int count) {
 		this.count = count;
-	}
-
-	public void setFirstBonus(boolean firstBonus) {
-		this.firstBonus = firstBonus;
 	}
 }

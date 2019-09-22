@@ -1,6 +1,7 @@
 package com.demod.factorio;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -102,37 +103,32 @@ public class DataTable {
 		}
 
 		technologies.values().stream()
-				.filter(t -> (t.isUpgrade() || t.isMaxLevelInfinite()) && t.getName().endsWith("-1"))
+				.filter(TechPrototype::isFirstBonus)
 				.forEach(firstBonus -> {
-					String bonusMatch = firstBonus.getName().substring(0, firstBonus.getName().length() - 1);
+					String firstBonusName = firstBonus.getName();
+					String bonusMatch = firstBonusName.substring(0, firstBonusName.length() - 1);
 					String bonusName = bonusMatch.substring(0, bonusMatch.length() - 1);
 
-					firstBonus.setFirstBonus(true);
 					List<TechPrototype> bonusGroup = technologies.values().stream()
 							.filter(bonus -> bonus.getName().startsWith(bonusMatch))
 							.peek(b -> b.setBonusLevel(-Integer.parseInt(b.getName().replace(bonusName, ""))))
-							.sorted((b1, b2) -> Integer.compare(b1.getBonusLevel(), b2.getBonusLevel()))
+							.sorted(Comparator.comparingInt(TechPrototype::getBonusLevel))
 							.collect(Collectors.toList());
 
 					for (TechPrototype bonus : bonusGroup) {
 						bonus.setBonus(true);
 						bonus.setBonusName(bonusName);
 						bonus.setBonusGroup(bonusGroup);
-
-						LuaValue countFormulaLua = bonus.lua().get("unit").get("count_formula");
-						if (!countFormulaLua.isnil()) {
-							bonus.setBonusFormula(Optional.of(countFormulaLua.tojstring()),
-									Optional.of(FactorioData.parseCountFormula(countFormulaLua.tojstring())));
-						}
 					}
 				});
 
 		this.entities.values().stream().filter(e -> !excludedRecipesAndItems.contains(e.getName())).forEach(e -> {
 			LuaValue categories = e.lua().get("crafting_categories");
 			if (!categories.isnil()) {
-				Utils.forEach(categories, cat -> {
-					this.craftingCategories.putIfAbsent(cat.toString(), new ArrayList<EntityPrototype>());
-					this.craftingCategories.get(cat.toString()).add(e);
+				Utils.forEach(categories, category -> {
+					String categoryName = category.toString();
+					this.craftingCategories.computeIfAbsent(categoryName, k -> new ArrayList<>());
+					this.craftingCategories.get(categoryName).add(e);
 				});
 			}
 		});
