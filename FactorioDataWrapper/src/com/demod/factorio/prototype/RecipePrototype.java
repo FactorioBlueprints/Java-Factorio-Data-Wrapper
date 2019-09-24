@@ -1,7 +1,10 @@
 package com.demod.factorio.prototype;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
@@ -15,6 +18,7 @@ public class RecipePrototype extends DataPrototype {
 	private final Map<String, Double> outputs = new LinkedHashMap<>();
 	private final double energyRequired;
 	private final boolean handCraftable;
+	private final boolean hasFluid;
 
 	public RecipePrototype(LuaTable lua, String name, String type, boolean expensive) {
 		super(lua, name, type);
@@ -59,7 +63,22 @@ public class RecipePrototype extends DataPrototype {
 		energyRequired = lua.get("energy_required").optdouble(0.5);
 		category = lua.get("category").optjstring("crafting");
 		handCraftable = category.equals("crafting");
+		hasFluid = this.calculateHasFluid(lua);
 	}
+
+	private boolean calculateHasFluid(LuaTable lua) {
+		List<LuaValue> items = new ArrayList<>();
+		Utils.forEach(lua.get("ingredients"), (Consumer<LuaValue>) items::add);
+		LuaValue resultsLua = lua.get("results");
+		if (resultsLua != LuaValue.NIL) {
+			items.add(resultsLua);
+		}
+
+		return items.stream()
+				.map(item -> item.get("type"))
+				.anyMatch(typeLua -> typeLua != LuaValue.NIL && typeLua.toString().equals("fluid"));
+	}
+
 
 	public String getCategory() {
 		return category;
@@ -79,6 +98,10 @@ public class RecipePrototype extends DataPrototype {
 
 	public boolean isHandCraftable() {
 		return handCraftable;
+	}
+
+	public boolean hasFluid() {
+		return hasFluid;
 	}
 
 	@Override
