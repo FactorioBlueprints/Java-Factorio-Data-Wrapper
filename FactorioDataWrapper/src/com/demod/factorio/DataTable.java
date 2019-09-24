@@ -122,16 +122,11 @@ public class DataTable {
 					}
 				});
 
-		this.entities.values().stream().filter(e -> !excludedRecipesAndItems.contains(e.getName())).forEach(e -> {
-			LuaValue categories = e.lua().get("crafting_categories");
-			if (!categories.isnil()) {
-				Utils.forEach(categories, category -> {
-					String categoryName = category.toString();
-					this.craftingCategories.computeIfAbsent(categoryName, k -> new ArrayList<>());
-					this.craftingCategories.get(categoryName).add(e);
-				});
-			}
-		});
+		this.entities.values().stream()
+				.filter(e -> !excludedRecipesAndItems.contains(e.getName()))
+				.forEach(e -> e.getCraftingCategories().stream()
+						.map(categoryName -> craftingCategories.computeIfAbsent(categoryName, k -> new ArrayList<>()))
+						.forEach(categoryNames -> categoryNames.add(e)));
 	}
 
 	private Set<String> asStringSet(ArrayNode arrayNode) {

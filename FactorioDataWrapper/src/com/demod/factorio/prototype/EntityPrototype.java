@@ -1,7 +1,9 @@
 package com.demod.factorio.prototype;
 
 import java.awt.geom.Rectangle2D;
+import java.awt.geom.Rectangle2D.Double;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.luaj.vm2.LuaTable;
@@ -13,6 +15,7 @@ public class EntityPrototype extends DataPrototype {
 
 	private final Rectangle2D.Double selectionBox;
 	private final List<String> flags = new ArrayList<>();
+	private final List<String> craftingCategories = new ArrayList<>();
 
 	public EntityPrototype(LuaTable lua, String name, String type) {
 		super(lua, name, type);
@@ -27,6 +30,13 @@ public class EntityPrototype extends DataPrototype {
 			flags.add(l.tojstring());
 		});
 
+		LuaValue categories = lua.get("crafting_categories");
+		if (!categories.isnil()) {
+			Utils.forEach(categories, category -> {
+				String categoryName = category.toString();
+				this.craftingCategories.add(categoryName);
+			});
+		}
 	}
 
 	public List<String> getFlags() {
@@ -37,4 +47,7 @@ public class EntityPrototype extends DataPrototype {
 		return selectionBox;
 	}
 
+	public List<String> getCraftingCategories() {
+		return Collections.unmodifiableList(this.craftingCategories);
+	}
 }
