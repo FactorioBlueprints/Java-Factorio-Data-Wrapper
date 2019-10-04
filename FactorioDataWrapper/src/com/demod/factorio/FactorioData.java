@@ -32,7 +32,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaTable;
-import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.BaseLib;
 import org.luaj.vm2.lib.DebugLib;
 import org.luaj.vm2.lib.ResourceFinder;
@@ -58,6 +57,9 @@ public class FactorioData {
 	private static DataTable dataTable = null;
 	private static ModLoader modLoader;
 
+	public static void main(String[] args) throws IOException {
+		DataTable table = FactorioData.getTable();
+	}
 	/**
 	 * I'm assuming this is some weird grayscale image...
 	 */
@@ -82,26 +84,26 @@ public class FactorioData {
 	public static BufferedImage getIcon(DataPrototype prototype) {
 		String name = prototype.getName();
 		return modIconCache.computeIfAbsent(name, n -> {
-			LuaValue iconLua = prototype.lua().get("icon");
-			if (!iconLua.isnil()) {
-				return getModImage(iconLua.tojstring());
+			JsonNode iconJson = prototype.getObjectNode().path("icon");
+			if (!iconJson.isMissingNode()) {
+				return getModImage(iconJson.textValue());
 			}
-			LuaValue iconsLua = prototype.lua().get("icons");
+			JsonNode iconsJson = prototype.getObjectNode().path("icons");
 			BufferedImage icon = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
 			Graphics2D g = icon.createGraphics();
 			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 			AffineTransform pat = g.getTransform();
-			Utils.forEach(iconsLua, l -> {
-				BufferedImage image = getModImage(l.get("icon").tojstring());
+			for (JsonNode l : iconsJson) {
+				BufferedImage image = getModImage(l.path("icon").textValue());
 
-				LuaValue tintLua = l.get("tint");
-				if (!tintLua.isnil()) {
-					image = Utils.tintImage(image, Utils.parseColor(tintLua));
+				JsonNode tintJson = l.path("tint");
+				if (!tintJson.isMissingNode()) {
+					image = Utils.tintImage(image, Utils.parseColor(tintJson));
 				}
 
-				double scale = l.get("scale").optdouble(1.0);
-				Point shift = Utils.parsePoint(l.get("shift"));
+				double scale = l.path("scale").asDouble(1.0);
+				Point shift = Utils.parsePoint(l.path("shift"));
 
 				g.translate(shift.x, shift.y);
 				g.translate((icon.getWidth() / 2) - (image.getWidth() * (scale)) / 2,
@@ -109,7 +111,7 @@ public class FactorioData {
 				g.scale(scale, scale);
 				g.drawImage(image, 0, 0, null);
 				g.setTransform(pat);
-			});
+			};
 			g.dispose();
 			return icon;
 		});
@@ -186,11 +188,8 @@ public class FactorioData {
 
 		String luaPath = SEARCH_MOD + "/?.lua;" + SEARCH_RESOURCE + "/?.lua;"
 				+ Arrays.stream(luaFolders).map(f -> f.getAbsolutePath() + File.separator + "?.lua")
-						.collect(Collectors.joining(";")).replace('\\', '/');
+				.collect(Collectors.joining(";")).replace('\\', '/');
 		// System.out.println("LUA_PATH: " + luaPath);
-
-		TypeHierarchy typeHiearchy = new TypeHierarchy(Utils
-				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("type-hiearchy.json")));
 
 		Box<Mod> currentMod = Box.of(modLoader.getMod("core").get());
 
@@ -248,10 +247,8 @@ public class FactorioData {
 				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("exclude-data.json"));
 		ObjectNode wikiNamingJson = Utils
 				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("wiki-naming.json"));
-		DataTable dataTable = new DataTable(typeHiearchy, globals.get("data").checktable(), excludeDataJson,
-				wikiNamingJson);
 
-		return dataTable;
+		return new DataTable(typeHierarchy, jsonData, excludeDataJson, wikiNamingJson);
 	}
 
 	private static void initializeSettings(Globals globals) {

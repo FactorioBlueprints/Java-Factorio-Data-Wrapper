@@ -38,7 +38,7 @@ public class DataTable {
 	}
 
 	private final TypeHierarchy typeHierarchy;
-	private final LuaTable rawLua;
+	private final ObjectNode rawJson;
 
 	private final ObjectNode nameMappingTechnologies;
 	private final ObjectNode nameMappingItemsRecipes;
@@ -56,10 +56,10 @@ public class DataTable {
 
 	private final Set<String> worldInputs = new LinkedHashSet<>();
 
-	public DataTable(TypeHiearchy typeHiearchy, LuaTable dataLua, ObjectNode excludeDataJson,
+	public DataTable(TypeHierarchy typeHierarchy, ObjectNode dataJson, ObjectNode excludeDataJson,
 			ObjectNode wikiNamingJson) {
-		this.typeHiearchy = typeHiearchy;
-		this.rawLua = dataLua.get("raw").checktable();
+		this.typeHierarchy = typeHierarchy;
+		this.rawJson = (ObjectNode) dataJson.path("raw");
 
 		Set<String> excludedRecipesAndItems = asStringSet((ArrayNode) excludeDataJson.path("recipes-and-items"));
 		Set<String> excludedTechnologies = asStringSet((ArrayNode) excludeDataJson.path("technologies"));
@@ -67,29 +67,33 @@ public class DataTable {
 		nameMappingTechnologies = (ObjectNode) wikiNamingJson.path("technologies");
 		nameMappingItemsRecipes = (ObjectNode) wikiNamingJson.path("items and recipes");
 
-		Utils.forEach(rawLua, v -> {
-			Utils.forEach(v.checktable(), protoLua -> {
-				String type = protoLua.get("type").tojstring();
-				String name = protoLua.get("name").tojstring();
+		for (JsonNode v : rawJson) {
+			if (!(v instanceof ObjectNode)) {
+				throw new AssertionError(v.getClass().getSimpleName());
+			}
+			for (JsonNode protoJson : v) {
+				ObjectNode protoObjectNode = (ObjectNode) protoJson;
+				String type = protoJson.path("type").textValue();
+				String name = protoJson.path("name").textValue();
 				if (typeHierarchy.isAssignable("item", type) && !excludedRecipesAndItems.contains(name)) {
-					items.put(name, new ItemPrototype(protoLua.checktable(), name, type));
+					items.put(name, new ItemPrototype(protoObjectNode, name, type));
 				} else if (typeHierarchy.isAssignable("recipe", type) && !excludedRecipesAndItems.contains(name)) {
-					recipes.put(name, new RecipePrototype(protoLua.checktable(), name, type, false));
-					expensiveRecipes.put(name, new RecipePrototype(protoLua.checktable(), name, type, true));
+					recipes.put(name, new RecipePrototype(protoObjectNode, name, type, false));
+					expensiveRecipes.put(name, new RecipePrototype(protoObjectNode, name, type, true));
 				} else if (typeHierarchy.isAssignable("entity", type)) {
-					entities.put(name, new EntityPrototype(protoLua.checktable(), name, type));
+					entities.put(name, new EntityPrototype(protoObjectNode, name, type));
 				} else if (typeHierarchy.isAssignable("fluid", type)) {
-					fluids.put(name, new FluidPrototype(protoLua.checktable(), name, type));
+					fluids.put(name, new FluidPrototype(protoObjectNode, name, type));
 				} else if (typeHierarchy.isAssignable("technology", type) && !excludedTechnologies.contains(name)) {
 					technologies.put(name,
-							new TechPrototype(protoLua.checktable(), name, type, excludedRecipesAndItems));
+							new TechPrototype(protoObjectNode, name, type, excludedRecipesAndItems));
 				} else if (typeHierarchy.isAssignable("equipment", type)) {
-					equipments.put(name, new EquipmentPrototype(protoLua.checktable(), name, type));
+					equipments.put(name, new EquipmentPrototype(protoObjectNode, name, type));
 				} else if (typeHierarchy.isAssignable("tile", type)) {
-					tiles.put(name, new TilePrototype(protoLua.checktable(), name, type));
+					tiles.put(name, new TilePrototype(protoObjectNode, name, type));
 				}
-			});
-		});
+			};
+		};
 
 		for (RecipePrototype recipe : recipes.values()) {
 			for (String input : recipe.getInputs().keySet()) {
@@ -188,19 +192,19 @@ public class DataTable {
 				.collect(Collectors.toList());
 	}
 
-	public Optional<LuaValue> getRaw(String... path) {
-		LuaValue retLua = rawLua;
+	public Optional<JsonNode> getRaw(String... path) {
+		JsonNode retJson = rawJson;
 		for (String key : path) {
-			retLua = retLua.get(key);
-			if (retLua.isnil()) {
+			retJson = retJson.path(key);
+			if (retJson.isMissingNode()) {
 				return Optional.empty();
 			}
 		}
-		return Optional.of(retLua);
+		return Optional.of(retJson);
 	}
 
-	public LuaTable getRawLua() {
-		return rawLua;
+	public ObjectNode getRawJson() {
+		return rawJson;
 	}
 
 	public Optional<RecipePrototype> getRecipe(String name) {

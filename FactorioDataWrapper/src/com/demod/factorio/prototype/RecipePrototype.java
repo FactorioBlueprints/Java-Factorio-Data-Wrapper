@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import org.luaj.vm2.LuaTable;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.LuaValue;
 
 import com.demod.factorio.Utils;
@@ -20,63 +22,67 @@ public class RecipePrototype extends DataPrototype {
 	private final boolean handCraftable;
 	private final boolean hasFluid;
 
-	public RecipePrototype(LuaTable lua, String name, String type, boolean expensive) {
-		super(lua, name, type);
-
-		LuaValue difficultyLua = lua.get(expensive ? "expensive" : "normal");
-		if (!difficultyLua.isnil()) {
-			Utils.forEach(difficultyLua, (k, v) -> {
-				lua.set(k, v);
+	public RecipePrototype(ObjectNode objectNode, String name, String type, boolean expensive) {
+		super(objectNode, name, type);
+		JsonNode difficultyJson = objectNode.path(expensive ? "expensive" : "normal");
+		if (!difficultyJson.isMissingNode()) {
+			difficultyJson.fields().forEachRemaining(entry -> {
+				String k = entry.getKey();
+				JsonNode v = entry.getValue();
+				objectNode.set(k, v);
 			});
 		}
 
-		LuaValue ingredientsLua = lua.get("ingredients");
-		Utils.forEach(ingredientsLua, lv -> {
-			if (lv.get("name").isnil()) {
-				inputs.put(lv.get(1).tojstring(), lv.get(2).toint());
+		JsonNode ingredientsJson = objectNode.path("ingredients");
+		for (JsonNode lv : ingredientsJson) {
+			JsonNode nameNode = lv.path("name");
+			if (nameNode.isMissingNode()) {
+				inputs.put(lv.get(0).textValue(), lv.get(1).intValue());
 			} else {
-				inputs.put(lv.get("name").tojstring(), lv.get("amount").toint());
+				inputs.put(nameNode.textValue(), lv.path("amount").intValue());
 			}
-		});
+		};
 
-		LuaValue resultLua = lua.get("result");
-		if (resultLua.isnil()) {
-			resultLua = lua.get("results");
+		JsonNode resultJson = objectNode.path("result");
+		if (resultJson.isMissingNode()) {
+			resultJson = objectNode.path("results");
 		}
-		if (resultLua.istable()) {
-			Utils.forEach(resultLua, lv -> {
-				if (lv.get("name").isnil()) {
-					outputs.put(lv.get(1).tojstring(), (double) lv.get(2).toint());
+		if (resultJson instanceof ArrayNode) {
+			for (JsonNode lv : resultJson) {
+				JsonNode nameNode = lv.path("name");
+				if (nameNode.isMissingNode()) {
+					outputs.put(lv.get(0).textValue(), lv.get(1).doubleValue());
 				} else {
-					LuaValue probabilityLua = lv.get("probability");
-					if (probabilityLua.isnil()) {
-						outputs.put(lv.get("name").tojstring(), (double) lv.get("amount").toint());
+					JsonNode probabilityJson = lv.path("probability");
+					if (probabilityJson.isMissingNode()) {
+						outputs.put(lv.path("name").textValue(), lv.path("amount").doubleValue());
 					} else {
-						outputs.put(lv.get("name").tojstring(), probabilityLua.todouble());
+						outputs.put(lv.path("name").textValue(), probabilityJson.doubleValue());
 					}
 				}
-			});
+			};
 		} else {
-			outputs.put(resultLua.tojstring(), (double) lua.get("result_count").optint(1));
+			outputs.put(resultJson.textValue(), objectNode.path("result_count").asDouble(1));
 		}
 
-		energyRequired = lua.get("energy_required").optdouble(0.5);
-		category = lua.get("category").optjstring("crafting");
+		energyRequired = objectNode.path("energy_required").asDouble(0.5);
+		category = objectNode.path("category").asText("crafting");
 		handCraftable = category.equals("crafting");
-		hasFluid = this.calculateHasFluid(lua);
+		hasFluid = this.calculateHasFluid(objectNode);
 	}
 
-	private boolean calculateHasFluid(LuaTable lua) {
-		List<LuaValue> items = new ArrayList<>();
-		Utils.forEach(lua.get("ingredients"), (Consumer<LuaValue>) items::add);
-		LuaValue resultsLua = lua.get("results");
-		if (resultsLua != LuaValue.NIL) {
-			items.add(resultsLua);
+	private boolean calculateHasFluid(ObjectNode json) {
+		List<JsonNode> items = new ArrayList<>();
+		JsonNode ingredientsJson = json.path("ingredients");
+		ingredientsJson.forEach(items::add);
+		JsonNode resultsJson = json.path("results");
+		if (!resultsJson.isMissingNode()) {
+			items.add(resultsJson);
 		}
 
 		return items.stream()
-				.map(item -> item.get("type"))
-				.anyMatch(typeLua -> typeLua != LuaValue.NIL && typeLua.toString().equals("fluid"));
+				.map(item -> item.path("type"))
+				.anyMatch(typeJson -> !typeJson.isMissingNode() && typeJson.textValue().equals("fluid"));
 	}
 
 

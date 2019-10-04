@@ -105,28 +105,6 @@ public final class Utils {
 		});
 	}
 
-	public static void debugPrintLua(LuaValue value) {
-		debugPrintLua("", value, System.out);
-	}
-
-	public static void debugPrintLua(LuaValue value, PrintStream ps) {
-		debugPrintLua("", value, ps);
-	}
-
-	private static void debugPrintLua(String prefix, LuaValue value, PrintStream ps) {
-		if (value.istable()) {
-			forEachSorted(value, (k, v) -> {
-				if (v.istable()) {
-					debugPrintLua(prefix + k + ".", v, ps);
-				} else {
-					ps.println(prefix + k + " = " + v);
-				}
-			});
-		} else {
-			ps.println(prefix.isEmpty() ? value : (prefix + " = " + value));
-		}
-	}
-
 	@SuppressWarnings("unchecked")
 	public static <T> void forEach(ArrayNode arrayNode, BiConsumer<Integer, T> consumer) {
 		for (int i = 0; i < arrayNode.size(); i++) {
@@ -216,11 +194,11 @@ public final class Utils {
 		return false;
 	}
 
-	public static Color parseColor(LuaValue value) {
-		float red = value.get("r").tofloat();
-		float green = value.get("g").tofloat();
-		float blue = value.get("b").tofloat();
-		float alpha = value.get("a").tofloat();
+	public static Color parseColor(JsonNode value) {
+		float red = value.path("r").floatValue();
+		float green = value.path("g").floatValue();
+		float blue = value.path("b").floatValue();
+		float alpha = value.path("a").floatValue();
 		if (red > 1 || green > 1 || blue > 1 || alpha > 1) {
 			red /= 255;
 			green /= 255;
@@ -230,11 +208,11 @@ public final class Utils {
 		return new Color(red, green, blue, alpha);
 	}
 
-	public static Point parsePoint(LuaValue value) {
-		if (value.isnil()) {
+	public static Point parsePoint(JsonNode value) {
+		if (value.isMissingNode()) {
 			return new Point();
 		}
-		return new Point(value.get(1).checkint(), value.get(2).checkint());
+		return new Point(value.path(1).intValue(), value.path(2).intValue());
 	}
 
 	public static Point2D.Double parsePoint2D(ObjectNode json) {
@@ -264,14 +242,26 @@ public final class Utils {
 				json.path(3).intValue());
 	}
 
-	public static Rectangle2D.Double parseRectangle(LuaValue value) {
-		LuaTable table = value.checktable();
-		LuaValue p1 = table.get(1);
-		LuaValue p2 = table.get(2);
-		double x1 = p1.get(1).checkdouble();
-		double y1 = p1.get(2).checkdouble();
-		double x2 = p2.get(1).checkdouble();
-		double y2 = p2.get(2).checkdouble();
+	public static Rectangle2D.Double parseRectangle(JsonNode value) {
+		JsonNode p1 = value.path(0);
+		JsonNode p2 = value.path(1);
+		if (!p1.path(0).isNumber()) {
+			throw new AssertionError();
+		}
+		if (!p1.path(1).isNumber()) {
+			throw new AssertionError();
+		}
+		if (!p2.path(0).isNumber()) {
+			throw new AssertionError();
+		}
+		if (!p2.path(1).isNumber()) {
+			throw new AssertionError();
+		}
+
+		double x1 = p1.get(0).doubleValue();
+		double y1 = p1.get(1).doubleValue();
+		double x2 = p2.get(0).doubleValue();
+		double y2 = p2.get(1).doubleValue();
 		return new Rectangle2D.Double(x1, y1, x2 - x1, y2 - y1);
 	}
 

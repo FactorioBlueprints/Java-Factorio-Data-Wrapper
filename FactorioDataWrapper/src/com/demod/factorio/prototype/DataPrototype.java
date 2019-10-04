@@ -1,24 +1,16 @@
 package com.demod.factorio.prototype;
 
-import org.luaj.vm2.LuaTable;
-
-import com.demod.factorio.Utils;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public abstract class DataPrototype {
-	private final LuaTable lua;
+	private final ObjectNode objectNode;
 	private final String name;
 	private final String type;
 
-	public DataPrototype(LuaTable lua, String name, String type) {
-		this.lua = lua;
+	public DataPrototype(ObjectNode objectNode, String name, String type) {
+		this.objectNode = objectNode;
 		this.name = name;
 		this.type = type;
-	}
-
-	public void debugPrint() {
-		System.out.println();
-		System.out.println(name);
-		Utils.debugPrintLua(lua);
 	}
 
 	@Override
@@ -51,7 +43,12 @@ public abstract class DataPrototype {
 		return name.hashCode();
 	}
 
-	public LuaTable lua() {
-		return lua;
+	public ObjectNode getObjectNode() {
+		return objectNode;
+	}
+
+	@Override
+	public String toString() {
+		return name;
 	}
 }

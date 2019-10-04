@@ -8,11 +8,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
@@ -32,6 +35,7 @@ import com.demod.factorio.FactorioData;
 import com.demod.factorio.ModInfo;
 import com.demod.factorio.TotalRawCalculator;
 import com.demod.factorio.Utils;
+import com.demod.factorio.prototype.DataPrototype;
 import com.demod.factorio.prototype.EntityPrototype;
 import com.demod.factorio.prototype.RecipePrototype;
 import com.demod.factorio.prototype.TechPrototype;
@@ -187,13 +191,15 @@ public class FactorioWikiMain {
 
 		Multimap<String, String> leafs = LinkedHashMultimap.create();
 
-		Utils.forEach(table.getRawLua(), v -> {
-			Utils.forEach(v.checktable(), protoLua -> {
-				String type = protoLua.get("type").tojstring();
-				String name = protoLua.get("name").tojstring();
+		ObjectNode rawJson = table.getRawJson();
+		for (JsonNode v : rawJson) {
+			ObjectNode objectNode = (ObjectNode) v;
+			for (JsonNode jsonNode : objectNode) {
+				String type = jsonNode.path("type").textValue();
+				String name = jsonNode.path("name").textValue();
 				leafs.put(type, name);
-			});
-		});
+			};
+		};
 
 		leafs.keySet().stream().sorted().forEach(type -> {
 			ArrayNode jsonNodes = json.putArray(type);
@@ -206,27 +212,33 @@ public class FactorioWikiMain {
 	private static ObjectNode wiki_Entities(DataTable table, Map<String, WikiTypeMatch> wikiTypes) {
 		ObjectNode json = createObjectNode();
 
-		Optional<LuaValue> optUtilityConstantsLua = table.getRaw("utility-constants", "default");
-		LuaValue utilityConstantsLua = optUtilityConstantsLua.get();
+		Optional<JsonNode> optUtilityConstantsLua = table.getRaw("utility-constants", "default");
+		JsonNode utilityConstantsLua = optUtilityConstantsLua.get();
 
-		Color defaultFriendlyColor = Utils.parseColor(utilityConstantsLua.get("chart").get("default_friendly_color"));
+		Color defaultFriendlyColor = Utils.parseColor(utilityConstantsLua.path("chart").path("default_friendly_color"));
 		Map<String, Color> defaultFriendlyColorByType = new HashMap<>();
-		Utils.forEach(utilityConstantsLua.get("chart").get("default_friendly_color_by_type"), (k, v) -> {
-			defaultFriendlyColorByType.put(k.tojstring(), Utils.parseColor(v));
-		});
+		utilityConstantsLua
+				.path("chart")
+				.path("default_friendly_color_by_type")
+				.fields()
+				.forEachRemaining(entry -> {
+					String key = entry.getKey();
+					Color color = Utils.parseColor(entry.getValue());
+					defaultFriendlyColorByType.put(key, color);
+				});
 
-		table.getEntities().values().stream().sorted((e1, e2) -> e1.getName().compareTo(e2.getName()))
+		table.getEntities().values().stream().sorted(Comparator.comparing(DataPrototype::getName))
 				.filter(e -> !wikiTypes.get(e.getName()).toString().equals("N/A")).forEach(e -> {
 					Color mapColor = null;
-					LuaValue friendlyMapColorLua = e.lua().get("friendly_map_color");
-					if (!friendlyMapColorLua.isnil()) {
-						mapColor = Utils.parseColor(friendlyMapColorLua);
+					JsonNode friendlyMapColorJson = e.getObjectNode().path("friendly_map_color");
+					if (!friendlyMapColorJson.isMissingNode()) {
+						mapColor = Utils.parseColor(friendlyMapColorJson);
 					} else {
-						LuaValue mapColorLua = e.lua().get("map_color");
-						if (!mapColorLua.isnil()) {
-							mapColor = Utils.parseColor(mapColorLua);
+						JsonNode mapColorJson = e.getObjectNode().path("map_color");
+						if (!mapColorJson.isMissingNode()) {
+							mapColor = Utils.parseColor(mapColorJson);
 						} else {
-							mapColor = defaultFriendlyColorByType.get(e.lua().get("type").tojstring());
+							mapColor = defaultFriendlyColorByType.get(e.getObjectNode().path("type").textValue());
 							if (mapColor == null && !e.getFlags().contains("not-on-map")) {
 								mapColor = defaultFriendlyColor;
 							}
@@ -238,21 +250,21 @@ public class FactorioWikiMain {
 						mapColor = null; // these entity types are not drawn on map normally
 					}
 
-					double health = e.lua().get("max_health").todouble();
-					LuaValue minableLua = e.lua().get("minable");
-					LuaValue resistances = e.lua().get("resistances");
-					LuaValue energySource = e.lua().get("energy_source");
-					if (energySource.isnil() && !e.lua().get("burner").isnil())
-						energySource = e.lua().get("burner");
+					double health = e.getObjectNode().path("max_health").doubleValue();
+					JsonNode minableLua = e.getObjectNode().path("minable");
+					JsonNode resistances = e.getObjectNode().path("resistances");
+					JsonNode energySource = e.getObjectNode().path("energy_source");
+					if (energySource.isMissingNode() && !e.getObjectNode().path("burner").isMissingNode())
+						energySource = e.getObjectNode().path("burner");
 					double emissions = 0.0;
 
-					if (!energySource.isnil()) {
-						LuaValue prototypeEmissions = energySource.get("emissions_per_minute");
-						if (!prototypeEmissions.isnil())
-							emissions = prototypeEmissions.todouble();
+					if (!energySource.isMissingNode()) {
+						JsonNode prototypeEmissions = energySource.path("emissions_per_minute");
+						if (!prototypeEmissions.isMissingNode())
+							emissions = prototypeEmissions.doubleValue();
 					}
 
-					if (mapColor != null || health > 0 || !minableLua.isnil() || emissions > 0 || !resistances.isnil()) {
+					if (mapColor != null || health > 0 || !minableLua.isMissingNode() || emissions > 0 || !resistances.isMissingNode()) {
 						ObjectNode itemJson = createObjectNode();
 						json.put(table.getWikiEntityName(e.getName()), itemJson);
 
@@ -261,22 +273,22 @@ public class FactorioWikiMain {
 									mapColor.getGreen(), mapColor.getBlue()));
 						if (health > 0)
 							itemJson.put("health", health);
-						if (!minableLua.isnil())
-							itemJson.put("mining-time", minableLua.get("mining_time").todouble());
+						if (!minableLua.isMissingNode())
+							itemJson.put("mining-time", minableLua.path("mining_time").doubleValue());
 						if (emissions > 0)
 							itemJson.put("pollution", Math.round(emissions * 100) / 100.0);
-						if (!resistances.isnil()) {
+						if (!resistances.isMissingNode()) {
 							ObjectNode resistancesJson = createObjectNode();
 							itemJson.put("resistances", resistancesJson);
 
-							Utils.forEach(resistances, resist -> {
+							for (JsonNode resist : resistances) {
 								ObjectNode resistJson = createObjectNode();
-								resistancesJson.put(resist.get("type").toString(), resistJson);
-								LuaValue percent = resist.get("percent");
-								LuaValue decrease = resist.get("decrease");
-								resistJson.put("percent", !percent.isnil() ? percent.toint() : 0);
-								resistJson.put("decrease", !decrease.isnil() ? decrease.toint() : 0);
-							});
+								resistancesJson.put(resist.path("type").toString(), resistJson);
+								JsonNode percent = resist.path("percent");
+								JsonNode decrease = resist.path("decrease");
+								resistJson.put("percent", !percent.isMissingNode() ? percent.intValue() : 0);
+								resistJson.put("decrease", !decrease.isMissingNode() ? decrease.intValue() : 0);
+							};
 						}
 					}
 				});
@@ -285,9 +297,9 @@ public class FactorioWikiMain {
 		table.getTiles().values().stream().sorted((t1, t2) -> t1.getName().compareTo(t2.getName()))
 				.filter(t -> table.hasWikiEntityName(t.getName())).forEach(t -> {
 					Color mapColor = null;
-					LuaValue mapColorLua = t.lua().get("map_color");
-					if (!mapColorLua.isnil())
-						mapColor = Utils.parseColor(mapColorLua);
+					JsonNode mapColorJson = t.getObjectNode().path("map_color");
+					if (!mapColorJson.isMissingNode())
+						mapColor = Utils.parseColor(mapColorJson);
 
 					if (mapColor != null) {
 						ObjectNode itemJson = createObjectNode();
@@ -403,10 +415,10 @@ public class FactorioWikiMain {
 		folder.mkdirs();
 
 		table.getRecipes().values().stream().forEach(recipe -> {
-			if (!recipe.lua().get("icons").isnil()) {
+			if (!recipe.getObjectNode().path("icons").isMissingNode()) {
 				System.out.println();
 				System.out.println(recipe.getName());
-				Utils.debugPrintLua(recipe.lua().get("icons"));
+				// Utils.debugPrintJson(recipe.getObjectNode().path("icons"));
 				try {
 					ImageIO.write(FactorioData.getIcon(recipe), "PNG", new File(folder, recipe.getName() + ".png"));
 				} catch (IOException e) {
@@ -415,10 +427,10 @@ public class FactorioWikiMain {
 			}
 		});
 		table.getItems().values().stream().forEach(item -> {
-			if (!item.lua().get("icons").isnil()) {
+			if (!item.getObjectNode().path("icons").isMissingNode()) {
 				System.out.println();
 				System.out.println(item.getName());
-				Utils.debugPrintLua(item.lua().get("icons"));
+				// Utils.debugPrintJson(item.getObjectNode().path("icons"));
 				try {
 					ImageIO.write(FactorioData.getIcon(item), "PNG", new File(folder, item.getName() + ".png"));
 				} catch (IOException e) {
@@ -449,7 +461,7 @@ public class FactorioWikiMain {
 				names.stream().map(n -> table.getWikiRecipeName(n)).forEach(consumers::add);
 			}
 
-			itemJson.put("stack-size", item.lua().get("stack_size").toint());
+			itemJson.put("stack-size", item.getObjectNode().path("stack_size").intValue());
 
 			Collection<String> reqTech = requiredTechnologies.get(item.getName());
 			if (!reqTech.isEmpty()) {
@@ -711,17 +723,18 @@ public class FactorioWikiMain {
 			links.put("__ROOT__", n);
 		});
 
-		Utils.forEach(table.getRawLua(), v -> {
-			Utils.forEach(v.checktable(), protoLua -> {
-				String type = protoLua.get("type").tojstring();
-				String name = protoLua.get("name").tojstring();
+		ObjectNode rawJson = table.getRawJson();
+		for (JsonNode v : rawJson) {
+			for (JsonNode protoLua : v) {
+				String type = protoLua.path("type").textValue();
+				String name = protoLua.path("name").textValue();
 				leafs.put(type, name);
 				if (!table.getTypeHierarchy().getParents().containsKey(type)
 						&& !table.getTypeHierarchy().getRoots().contains(type)) {
 					System.err.println("MISSING PARENT FOR TYPE: " + type + " (" + name + ")");
 				}
-			});
-		});
+			};
+		};
 
 		Collection<String> rootTypes = links.get("__ROOT__");
 		rootTypes.stream().sorted().forEach(n -> {

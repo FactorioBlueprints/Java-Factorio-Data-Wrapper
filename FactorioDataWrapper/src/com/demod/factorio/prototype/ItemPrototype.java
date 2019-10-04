@@ -1,9 +1,10 @@
 package com.demod.factorio.prototype;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.LuaTable;
 
 public class ItemPrototype extends DataPrototype {
-	public ItemPrototype(LuaTable lua, String name, String type) {
-		super(lua, name, type);
+	public ItemPrototype(ObjectNode objectNode, String name, String type) {
+		super(objectNode, name, type);
 	}
 }

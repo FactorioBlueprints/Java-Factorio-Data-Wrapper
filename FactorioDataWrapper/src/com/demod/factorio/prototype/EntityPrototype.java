@@ -1,13 +1,12 @@
 package com.demod.factorio.prototype;
 
 import java.awt.geom.Rectangle2D;
-import java.awt.geom.Rectangle2D.Double;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.luaj.vm2.LuaTable;
-import org.luaj.vm2.LuaValue;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import com.demod.factorio.Utils;
 
@@ -17,25 +16,24 @@ public class EntityPrototype extends DataPrototype {
 	private final List<String> flags = new ArrayList<>();
 	private final List<String> craftingCategories = new ArrayList<>();
 
-	public EntityPrototype(LuaTable lua, String name, String type) {
-		super(lua, name, type);
-		LuaValue selectionBoxLua = lua.get("selection_box");
-		if (!selectionBoxLua.isnil()) {
-			selectionBox = Utils.parseRectangle(selectionBoxLua);
+	public EntityPrototype(ObjectNode json, String name, String type) {
+		super(json, name, type);
+		JsonNode selectionBoxJson = json.path("selection_box");
+		if (!selectionBoxJson.isMissingNode()) {
+			selectionBox = Utils.parseRectangle(selectionBoxJson);
 		} else {
 			selectionBox = new Rectangle2D.Double();
 		}
 
-		Utils.forEach(lua.get("flags").opttable(new LuaTable()), l -> {
-			flags.add(l.tojstring());
-		});
+		JsonNode flags = json.path("flags");
+		for (JsonNode flag : flags) {
+			this.flags.add(flag.textValue());
+		}
 
-		LuaValue categories = lua.get("crafting_categories");
-		if (!categories.isnil()) {
-			Utils.forEach(categories, category -> {
-				String categoryName = category.toString();
-				this.craftingCategories.add(categoryName);
-			});
+		JsonNode categories = json.path("crafting_categories");
+		for (JsonNode category : categories) {
+			String categoryName = category.textValue();
+			this.craftingCategories.add(categoryName);
 		}
 	}
 

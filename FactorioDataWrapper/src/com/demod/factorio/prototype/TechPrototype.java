@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.IntUnaryOperator;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
@@ -16,24 +18,24 @@ import com.demod.factorio.Utils;
 public class TechPrototype extends DataPrototype {
 
 	public static class Effect {
-		private final LuaValue lua;
+		private final JsonNode json;
 		private final String type;
 		private final double modifier;
 		private final Optional<String> recipe;
 		private final String key;
 
-		public Effect(LuaValue lua) {
-			this.lua = lua;
-			type = lua.get("type").tojstring();
-			LuaValue modifierLua = lua.get("modifier");
-			modifier = modifierLua.isnumber()
-					? modifierLua.todouble()
+		public Effect(JsonNode json) {
+			this.json = json;
+			type = json.path("type").textValue();
+			JsonNode modifierJson = json.path("modifier");
+			modifier = modifierJson.isNumber()
+					? modifierJson.doubleValue()
 					: 0;
 			recipe = this.type.equals("unlock-recipe")
-					? Optional.of(lua.get("recipe").tojstring())
+					? Optional.of(json.path("recipe").textValue())
 					: Optional.empty();
 			key = type.equals("ammo-damage")
-					? type + "|" + lua.get("ammo_category").tojstring()
+					? type + "|" + json.path("ammo_category").textValue()
 					: type;
 		}
 
@@ -53,8 +55,8 @@ public class TechPrototype extends DataPrototype {
 			return key;
 		}
 
-		public LuaValue lua() {
-			return lua;
+		public JsonNode json() {
+			return json;
 		}
 	}
 
@@ -78,26 +80,29 @@ public class TechPrototype extends DataPrototype {
 	private String bonusName;
 	private int bonusLevel;
 
-	public TechPrototype(LuaTable lua, String name, String type, Set<String> excludedRecipesAndItems) {
-		super(lua, name, type);
+	public TechPrototype(ObjectNode json, String name, String type, Set<String> excludedRecipesAndItems) {
+		super(json, name, type);
 
-		upgrade = lua.get("upgrade").toboolean();
-		order = lua.get("order").tojstring();
+		upgrade = json.path("upgrade").booleanValue();
+		order = json.path("order").textValue();
 
-		Utils.forEach(lua.get("prerequisites").opttable(new LuaTable()), l -> {
-			prerequisites.add(l.tojstring());
-		});
+		JsonNode prerequisites = json.path("prerequisites");
+		for (JsonNode prerequisite : prerequisites) {
+			this.prerequisites.add(prerequisite.textValue());
+		};
 
-		Utils.forEach(lua.get("effects").opttable(new LuaTable()), l -> {
-			effects.add(new Effect(l));
-		});
+		JsonNode effects = json.path("effects");
+		for (JsonNode effect : effects) {
+			this.effects.add(new Effect(effect));
+		};
 
-		LuaValue unitLua = lua.get("unit");
-		Utils.forEach(unitLua.get("ingredients"), lv -> {
-			ingredients.put(lv.get(1).tojstring(), lv.get(2).toint());
-		});
-		count = unitLua.get("count").toint();
-		time = unitLua.get("time").todouble();
+		JsonNode unitJson = json.path("unit");
+		JsonNode ingredients = unitJson.path("ingredients");
+		for (JsonNode ingredient : ingredients) {
+			this.ingredients.put(ingredient.path(1).textValue(), ingredient.path(2).intValue());
+		};
+		count = unitJson.path("count").intValue();
+		time = unitJson.path("time").doubleValue();
 
 		for (Effect effect : getEffects()) {
 			Optional<String> recipe = effect.getRecipe();
@@ -108,25 +113,25 @@ public class TechPrototype extends DataPrototype {
 			});
 		}
 
-		LuaValue maxLevelLua = lua.get("max_level");
-		if (!maxLevelLua.isnil()) {
-			String value = maxLevelLua.tojstring();
+		JsonNode maxLevelJson = json.path("max_level");
+		if (!maxLevelJson.isMissingNode()) {
+			String value = maxLevelJson.textValue();
 			maxLevel = Optional.of(value);
 			maxLevelInfinite = value.equals("infinite");
 		} else {
 			maxLevel = Optional.empty();
 			maxLevelInfinite = false;
 		}
-		bonusCountFormulaVisual = calculateCountFormula(lua);
+		bonusCountFormulaVisual = calculateCountFormula(json);
 		bonusCountFormula = bonusCountFormulaVisual.map(FactorioData::parseCountFormula);
 
 		firstBonus = calculateFirstBonus(name);
 	}
 
-	private Optional<String> calculateCountFormula(LuaTable lua) {
-		LuaValue countFormulaLua = lua.get("unit").get("count_formula");
-		if (!countFormulaLua.isnil()) {
-			String countFormulaString = countFormulaLua.tojstring();
+	private Optional<String> calculateCountFormula(ObjectNode json) {
+		JsonNode countFormulaJson = json.path("unit").path("count_formula");
+		if (!countFormulaJson.isMissingNode()) {
+			String countFormulaString = countFormulaJson.textValue();
 			return Optional.of(countFormulaString);
 		}
 
