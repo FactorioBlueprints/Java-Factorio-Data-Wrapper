@@ -15,14 +15,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
-import java.util.stream.Collector;
+import java.util.stream.Collectors;
 import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.LuaValue;
 
 import com.demod.factorio.Config;
@@ -119,10 +120,9 @@ public class FactorioWikiMain {
 	private static ModInfo baseInfo;
 	private static File folder;
 
-	private static JSONObject createOrderedJSONObject() {
-		JSONObject json = new JSONObject();
-		Utils.terribleHackToHaveOrderedJSONObject(json);
-		return json;
+	private static ObjectNode createObjectNode() {
+		ObjectMapper objectMapper = new ObjectMapper();
+		return objectMapper.createObjectNode();
 	}
 
 	private static Map<String, WikiTypeMatch> generateWikiTypes(DataTable table) {
@@ -144,12 +144,12 @@ public class FactorioWikiMain {
 		return protoMatches;
 	}
 
-	public static void main(String[] args) throws JSONException, IOException {
+	public static void main(String[] args) throws IOException {
 		DataTable table = FactorioData.getTable();
 		baseInfo = new ModInfo(
 				Utils.readJsonFromStream(new FileInputStream(new File(FactorioData.factorio, "data/base/info.json"))));
 
-		String outputPath = Config.get().optString("output", "output");
+		String outputPath = Config.get().path("output").asText("output");
 
 		folder = new File(outputPath + File.separator + baseInfo.getVersion());
 		folder.mkdirs();
@@ -170,19 +170,20 @@ public class FactorioWikiMain {
 		Desktop.getDesktop().open(folder);
 	}
 
-	private static JSONArray pair(Object a, Object b) {
-		JSONArray json = new JSONArray();
-		json.put(a);
-		json.put(b);
+	/*private static ArrayNode arrayPair(Object a, Object b) {
+		ObjectMapper objectMapper = new ObjectMapper();
+		ArrayNode json = objectMapper.createArrayNode();
+		json.add(a);
+		json.add(b);
 		return json;
 	}
 
-	private static <T> Collector<T, Object, JSONArray> toJsonArray() {
-		return Collectors.collectingAndThen(Collectors.toList(), JSONArray::new);
-	}
+	private static <T> Collector<T, Object, ArrayNode> toArrayNode() {
+		return Collectors.collectingAndThen(Collectors.toList(), ArrayNode::new);
+	}*/
 
-	private static JSONObject wiki_DataRawTree(DataTable table) {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_DataRawTree(DataTable table) {
+		ObjectNode json = createObjectNode();
 
 		Multimap<String, String> leafs = LinkedHashMultimap.create();
 
@@ -195,14 +196,15 @@ public class FactorioWikiMain {
 		});
 
 		leafs.keySet().stream().sorted().forEach(type -> {
-			json.put(type, leafs.get(type).stream().sorted().collect(toJsonArray()));
+			ArrayNode jsonNodes = json.putArray(type);
+			leafs.get(type).stream().sorted().forEach(jsonNodes::add);
 		});
 
 		return json;
 	}
 
-	private static JSONObject wiki_Entities(DataTable table, Map<String, WikiTypeMatch> wikiTypes) {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_Entities(DataTable table, Map<String, WikiTypeMatch> wikiTypes) {
+		ObjectNode json = createObjectNode();
 
 		Optional<LuaValue> optUtilityConstantsLua = table.getRaw("utility-constants", "default");
 		LuaValue utilityConstantsLua = optUtilityConstantsLua.get();
@@ -251,7 +253,7 @@ public class FactorioWikiMain {
 					}
 
 					if (mapColor != null || health > 0 || !minableLua.isnil() || emissions > 0 || !resistances.isnil()) {
-						JSONObject itemJson = createOrderedJSONObject();
+						ObjectNode itemJson = createObjectNode();
 						json.put(table.getWikiEntityName(e.getName()), itemJson);
 
 						if (mapColor != null)
@@ -264,11 +266,11 @@ public class FactorioWikiMain {
 						if (emissions > 0)
 							itemJson.put("pollution", Math.round(emissions * 100) / 100.0);
 						if (!resistances.isnil()) {
-							JSONObject resistancesJson = createOrderedJSONObject();
+							ObjectNode resistancesJson = createObjectNode();
 							itemJson.put("resistances", resistancesJson);
 
 							Utils.forEach(resistances, resist -> {
-								JSONObject resistJson = createOrderedJSONObject();
+								ObjectNode resistJson = createObjectNode();
 								resistancesJson.put(resist.get("type").toString(), resistJson);
 								LuaValue percent = resist.get("percent");
 								LuaValue decrease = resist.get("decrease");
@@ -288,7 +290,7 @@ public class FactorioWikiMain {
 						mapColor = Utils.parseColor(mapColorLua);
 
 					if (mapColor != null) {
-						JSONObject itemJson = createOrderedJSONObject();
+						ObjectNode itemJson = createObjectNode();
 						json.put(table.getWikiEntityName(t.getName()), itemJson);
 
 						itemJson.put("map-color", String.format("%02x%02x%02x", mapColor.getRed(), mapColor.getGreen(),
@@ -308,7 +310,7 @@ public class FactorioWikiMain {
 	}
 
 	/**
-	 * Same as {@link #wiki_fmtName(String, JSONObject)}, but adds a ", [number]"
+	 * Same as {@link #wiki_fmtName(String, ObjectNode)}, but adds a ", [number]"
 	 * when there is a number as the last part of the name. This adds the number to
 	 * the icon.
 	 */
@@ -321,12 +323,11 @@ public class FactorioWikiMain {
 		return wikiName;
 	}
 
-	private static JSONObject wiki_FormulaTechnologies(DataTable table) {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_FormulaTechnologies(DataTable table) {
+		ObjectNode json = createObjectNode();
 		table.getTechnologies().values().stream().filter(t -> t.isBonus()).map(t -> t.getBonusName()).distinct()
 				.sorted().forEach(bonusName -> {
-					JSONArray itemJson = new JSONArray();
-					json.put(table.getWikiTechnologyName(bonusName), itemJson);
+					ArrayNode itemJson = json.putArray(table.getWikiTechnologyName(bonusName));
 
 					TechPrototype firstTech = table.getTechnology(bonusName + "-1").get();
 					int maxBonus = firstTech.getBonusGroup().stream().mapToInt(TechPrototype::getBonusLevel).max()
@@ -391,7 +392,7 @@ public class FactorioWikiMain {
 										.map(e -> wiki_EffectModifierFormatter
 												.getOrDefault(e.getKey().split("\\|")[0], v -> "").apply(e.getValue()))
 										.filter(s -> !s.isEmpty()).distinct().collect(Collectors.joining(" "));
-						itemJson.put(markup);
+						itemJson.add(markup);
 					}
 				});
 		return json;
@@ -427,8 +428,8 @@ public class FactorioWikiMain {
 		});
 	}
 
-	private static JSONObject wiki_Items(DataTable table) {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_Items(DataTable table) {
+		ObjectNode json = createObjectNode();
 
 		Multimap<String, String> requiredTechnologies = LinkedHashMultimap.create();
 		table.getTechnologies().values()
@@ -437,22 +438,23 @@ public class FactorioWikiMain {
 						.forEach(name -> requiredTechnologies.put(name, tech.getName())));
 
 		table.getItems().values().stream().sorted((i1, i2) -> i1.getName().compareTo(i2.getName())).forEach(item -> {
-			JSONObject itemJson = createOrderedJSONObject();
+			ObjectNode itemJson = createObjectNode();
 			json.put(table.getWikiItemName(item.getName()), itemJson);
 
 			List<String> names = table.getRecipes().values().stream()
 					.filter(r -> r.getInputs().containsKey(item.getName())).map(RecipePrototype::getName).sorted()
 					.collect(Collectors.toList());
 			if (!names.isEmpty()) {
-				itemJson.put("consumers", names.stream().map(n -> table.getWikiRecipeName(n)).collect(toJsonArray()));
+				ArrayNode consumers = itemJson.putArray("consumers");
+				names.stream().map(n -> table.getWikiRecipeName(n)).forEach(consumers::add);
 			}
 
 			itemJson.put("stack-size", item.lua().get("stack_size").toint());
 
 			Collection<String> reqTech = requiredTechnologies.get(item.getName());
 			if (!reqTech.isEmpty()) {
-				itemJson.put("required-technologies",
-						reqTech.stream().sorted().map(n -> table.getWikiTechnologyName(n)).collect(toJsonArray()));
+				ArrayNode technologies = itemJson.putArray("required-technologies");
+				reqTech.stream().sorted().map(n -> table.getWikiTechnologyName(n)).forEach(technologies::add);
 			}
 		});
 
@@ -474,11 +476,9 @@ public class FactorioWikiMain {
 	 * |total-raw = Time, [ENERGY] + [Ingredient Name], [Ingredient Count] + ...
 	 * </pre>
 	 *
-	 * @param table
-	 * @param mappingJson
 	 */
-	private static JSONObject wiki_Recipes(DataTable table) throws FileNotFoundException {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_Recipes(DataTable table) {
+		ObjectNode json = createObjectNode();
 
 		Map<String, RecipePrototype> normalRecipes = table.getRecipes();
 		Map<String, RecipePrototype> expensiveRecipes = table.getExpensiveRecipes();
@@ -487,68 +487,83 @@ public class FactorioWikiMain {
 		TotalRawCalculator expensiveTotalRawCalculator = new TotalRawCalculator(expensiveRecipes);
 
 		Sets.union(normalRecipes.keySet(), expensiveRecipes.keySet()).stream().sorted().forEach(name -> {
-			JSONObject item = createOrderedJSONObject();
+			ObjectNode item = createObjectNode();
 			json.put(table.getWikiRecipeName(name), item);
 
 			{
 				RecipePrototype recipe = normalRecipes.get(name);
 				if (recipe != null) {
-					JSONArray recipeJson = new JSONArray();
-					item.put("recipe", recipeJson);
-					recipeJson.put(pair("Time", recipe.getEnergyRequired()));
+					ArrayNode recipeJson = item.putArray("recipe");
+					ArrayNode time = recipeJson.addArray();
+					time.add("Time") ;
+					time.add(recipe.getEnergyRequired());
+
 					recipe.getInputs().entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey()))
 							.forEach(entry -> {
-								recipeJson.put(pair(table.getWikiItemName(entry.getKey()), entry.getValue()));
+								ArrayNode pair = recipeJson.addArray();
+								pair.add(table.getWikiItemName(entry.getKey()));
+								pair.add(entry.getValue());
 							});
 					if (recipe.getOutputs().size() > 1
 							|| recipe.getOutputs().values().stream().findFirst().get() != 1) {
-						JSONArray recipeOutputJson = new JSONArray();
-						item.put("recipe-output", recipeOutputJson);
+						ArrayNode recipeOutputJson = item.putArray("recipe-output");
 						recipe.getOutputs().entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey()))
 								.forEach(entry -> {
-									recipeOutputJson.put(pair(table.getWikiItemName(entry.getKey()), entry.getValue()));
+									ArrayNode pair = recipeOutputJson.addArray();
+									pair.add(table.getWikiItemName(entry.getKey()));
+									pair.add(entry.getValue());
 								});
 					}
 
 					Map<String, Double> totalRaw = normalTotalRawCalculator.compute(recipe);
 
-					JSONArray totalRawJson = new JSONArray();
-					item.put("total-raw", totalRawJson);
-					totalRawJson.put(pair("Time", totalRaw.get(TotalRawCalculator.RAW_TIME)));
+					ArrayNode totalRawJson = item.putArray("total-raw");
+					ArrayNode pair = totalRawJson.addArray();
+					pair.add("Time");
+					pair.add(totalRaw.get(TotalRawCalculator.RAW_TIME));
 					totalRaw.entrySet().stream().filter(e -> !e.getKey().equals(TotalRawCalculator.RAW_TIME))
 							.sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).forEach(entry -> {
-								totalRawJson.put(pair(table.getWikiItemName(entry.getKey()), entry.getValue()));
+								ArrayNode innerPair = totalRawJson.addArray();
+								innerPair.add(table.getWikiItemName(entry.getKey()));
+								innerPair.add(entry.getValue());
 							});
 				}
 			}
 			{
 				RecipePrototype recipe = expensiveRecipes.get(name);
 				if (recipe != null) {
-					JSONArray recipeJson = new JSONArray();
-					item.put("expensive-recipe", recipeJson);
-					recipeJson.put(pair("Time", recipe.getEnergyRequired()));
+					ArrayNode recipeJson = item.putArray("expensive-recipe");
+					ArrayNode pair = recipeJson.addArray();
+					pair.add("Time");
+					pair.add(recipe.getEnergyRequired());
 					recipe.getInputs().entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey()))
 							.forEach(entry -> {
-								recipeJson.put(pair(table.getWikiItemName(entry.getKey()), entry.getValue()));
+								ArrayNode innerPair = recipeJson.addArray();
+								innerPair.add(table.getWikiItemName(entry.getKey()));
+								innerPair.add(entry.getValue());
 							});
 					if (recipe.getOutputs().size() > 1
 							|| recipe.getOutputs().values().stream().findFirst().get() != 1) {
-						JSONArray recipeOutputJson = new JSONArray();
-						item.put("expensive-recipe-output", recipeOutputJson);
+						ArrayNode recipeOutputJson = item.putArray("expensive-recipe-output");
 						recipe.getOutputs().entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey()))
 								.forEach(entry -> {
-									recipeOutputJson.put(pair(table.getWikiItemName(entry.getKey()), entry.getValue()));
+									ArrayNode innerPair = recipeOutputJson.addArray();
+									innerPair.add(table.getWikiItemName(entry.getKey()));
+									innerPair.add(entry.getValue());
 								});
 					}
 
 					Map<String, Double> totalRaw = expensiveTotalRawCalculator.compute(recipe);
 
-					JSONArray totalRawJson = new JSONArray();
-					item.put("expensive-total-raw", totalRawJson);
-					totalRawJson.put(pair("Time", totalRaw.get(TotalRawCalculator.RAW_TIME)));
+					ArrayNode totalRawJson = item.putArray("expensive-total-raw");
+					ArrayNode innerPair = totalRawJson.addArray();
+					innerPair.add("Time");
+					innerPair.add(totalRaw.get(TotalRawCalculator.RAW_TIME));
 					totalRaw.entrySet().stream().filter(e -> !e.getKey().equals(TotalRawCalculator.RAW_TIME))
 							.sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).forEach(entry -> {
-								totalRawJson.put(pair(table.getWikiItemName(entry.getKey()), entry.getValue()));
+								ArrayNode innerInnerPair = totalRawJson.addArray();
+								innerInnerPair.add(table.getWikiItemName(entry.getKey()));
+								innerInnerPair.add(entry.getValue());
 							});
 				}
 			}
@@ -556,7 +571,13 @@ public class FactorioWikiMain {
 			// category must be same for expensive and normal
 			String category = normalRecipes.get(name).getCategory();
 			Map<String, List<EntityPrototype>> craftingCategories = table.getCraftingCategories();
-			item.put("producers", craftingCategories.get(category).stream().sorted((e1, e2) -> e1.getName().compareTo(e2.getName())).map(e -> table.getWikiEntityName(e.getName())).collect(toJsonArray()));
+			ArrayNode producers = item.putArray("producers");
+			craftingCategories
+					.get(category)
+					.stream()
+					.sorted((e1, e2) -> e1.getName().compareTo(e2.getName()))
+					.map(e -> table.getWikiEntityName(e.getName()))
+					.forEach(producers::add);
 
 		});
 
@@ -585,8 +606,8 @@ public class FactorioWikiMain {
 	 * <br>
 	 * - Bilka
 	 */
-	private static JSONObject wiki_Technologies(DataTable table) {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_Technologies(DataTable table) {
+		ObjectNode json = createObjectNode();
 
 		Multimap<String, String> allowsMap = LinkedHashMultimap.create();
 		table.getTechnologies().values().forEach(tech -> tech.getPrerequisites()
@@ -594,67 +615,69 @@ public class FactorioWikiMain {
 
 		table.getTechnologies().values().stream().sorted((t1, t2) -> t1.getName().compareTo(t2.getName()))
 				.filter(t -> !t.isBonus() || t.isFirstBonus()).forEach(tech -> {
-					JSONObject itemJson = createOrderedJSONObject();
+					ObjectNode itemJson = createObjectNode();
 					json.put(table.getWikiTechnologyName(tech.isBonus() ? tech.getBonusName() : tech.getName()),
 							itemJson);
 
 					itemJson.put("internal-name", tech.getName());
+					ArrayNode costJson = itemJson.putArray("cost");
 
-					JSONArray costJson = new JSONArray();
-					costJson.put(pair("Time", tech.getTime()));
+					ArrayNode pair = costJson.addArray();
+					pair.add("Time");
+					pair.add( tech.getTime());
 					tech.getIngredients().entrySet().stream().sorted((e1, e2) -> Integer
 							.compare(wiki_ScienceOrdering.get(e1.getKey()), wiki_ScienceOrdering.get(e2.getKey())))
 							.forEach(entry -> {
-								costJson.put(pair(table.getWikiItemName(entry.getKey()), entry.getValue()));
+								ArrayNode innerPair = costJson.addArray();
+								innerPair.add(table.getWikiItemName(entry.getKey()));
+								innerPair.add(entry.getValue());
 							});
-					itemJson.put("cost", costJson);
 
 					int count = tech.getEffectiveCount();
 					itemJson.put("cost-multiplier", count);
 					itemJson.put("expensive-cost-multiplier", (count * 4));
 
 					if (!tech.getPrerequisites().isEmpty()) {
-						itemJson.put("required-technologies",
-								tech.getPrerequisites().stream().sorted()
-										.map(n -> wiki_fmtNumberedWikiName(table.getWikiTechnologyName(n)))
-										.collect(toJsonArray()));
+						ArrayNode requiredTechnologies = itemJson.putArray("required-technologies");
+						tech.getPrerequisites().stream().sorted()
+								.map(n -> wiki_fmtNumberedWikiName(table.getWikiTechnologyName(n)))
+								.forEach(requiredTechnologies::add);
 					}
 
 					if (!tech.isFirstBonus()) {
 						Collection<String> allows = allowsMap.get(tech.getName());
 						if (!allows.isEmpty()) {
-							itemJson.put("allows",
-									allows.stream().sorted()
-											.map(n -> wiki_fmtNumberedWikiName(table.getWikiTechnologyName(n)))
-											.collect(toJsonArray()));
+							ArrayNode allowsArray = itemJson.putArray("allows");
+							allows.stream().sorted()
+									.map(n -> wiki_fmtNumberedWikiName(table.getWikiTechnologyName(n)))
+									.forEach(allowsArray::add);
 						}
 					} else {
 						if (!tech.isMaxLevelInfinite() && tech.getBonusGroup().size() == 2) {
-							itemJson.put("allows", new JSONArray(
-									new String[] { table.getWikiTechnologyName(tech.getBonusName()) + ", 2" }));
+							ArrayNode allows = itemJson.putArray("allows");
+							allows.add(table.getWikiTechnologyName(tech.getBonusName()) + ", 2");
 						} else {
-
 							String lastLevel;
 							if (tech.isMaxLevelInfinite() || tech.getBonusGroup().get(tech.getBonusGroup().size() -1).isMaxLevelInfinite() )
 								lastLevel = "&infin;";
 							else
 								lastLevel = String.valueOf(tech.getBonusGroup().size());
-							itemJson.put("allows",
-									new JSONArray(new String[] { table.getWikiTechnologyName(tech.getBonusName())
-											+ ", 2-" + lastLevel }));
+							ArrayNode allows = itemJson.putArray("allows");
+							allows.add(table.getWikiTechnologyName(tech.getBonusName()) + ", 2-" + lastLevel);
 						}
 					}
 
 					if (!tech.getRecipeUnlocks().isEmpty()) {
-						itemJson.put("effects", tech.getRecipeUnlocks().stream().sorted()
-								.map(n -> table.getWikiRecipeName(n)).collect(toJsonArray()));
+						ArrayNode effects = itemJson.putArray("effects");
+						tech.getRecipeUnlocks().stream().sorted()
+								.map(n -> table.getWikiRecipeName(n)).forEach(effects::add);
 					}
 				});
 		return json;
 	}
 
-	private static JSONObject wiki_Types(DataTable table, Map<String, WikiTypeMatch> wikiTypes) {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_Types(DataTable table, Map<String, WikiTypeMatch> wikiTypes) {
+		ObjectNode json = createObjectNode();
 
 		wikiTypes.entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).forEach(e -> {
 			String name = e.getKey();
@@ -665,7 +688,7 @@ public class FactorioWikiMain {
 				return;
 			}
 
-			JSONObject item = createOrderedJSONObject();
+			ObjectNode item = createObjectNode();
 			json.put(m.item ? table.getWikiItemName(name) : table.getWikiRecipeName(name), item);
 			item.put("internal-name", name);
 			item.put("prototype-type", type);
@@ -675,8 +698,8 @@ public class FactorioWikiMain {
 	}
 
 	@SuppressWarnings("unused")
-	private static JSONObject wiki_TypeTree(DataTable table) {
-		JSONObject json = createOrderedJSONObject();
+	private static ObjectNode wiki_TypeTree(DataTable table) {
+		ObjectNode json = createObjectNode();
 
 		Multimap<String, String> links = LinkedHashMultimap.create();
 		Multimap<String, String> leafs = LinkedHashMultimap.create();
@@ -708,24 +731,26 @@ public class FactorioWikiMain {
 		return json;
 	}
 
-	private static JSONObject wiki_TypeTree_GenerateNode(Multimap<String, String> links, Multimap<String, String> leafs,
+	private static ObjectNode wiki_TypeTree_GenerateNode(Multimap<String, String> links, Multimap<String, String> leafs,
 			String parent) {
 		Collection<String> types = links.get(parent);
 		Collection<String> names = leafs.get(parent);
 
-		JSONObject nodeJson = createOrderedJSONObject();
+		ObjectNode nodeJson = createObjectNode();
 		Streams.concat(types.stream(), names.stream()).sorted().forEach(n -> {
 			if (types.contains(n)) {
 				nodeJson.put(n, wiki_TypeTree_GenerateNode(links, leafs, n));
 			} else {
-				nodeJson.put(n, new JSONObject());
+				nodeJson.putObject(n);
 			}
 		});
 		return nodeJson;
 	}
 
-	private static void write(JSONObject json, String name) throws JSONException, IOException {
-		Files.write(json.toString(2), new File(folder, name + "-" + baseInfo.getVersion() + ".json"),
+	private static void write(ObjectNode json, String name) throws IOException {
+		ObjectWriter objectWriter = new ObjectMapper().writerWithDefaultPrettyPrinter();
+		String string = objectWriter.writeValueAsString(json);
+		Files.write(string, new File(folder, name + "-" + baseInfo.getVersion() + ".json"),
 				StandardCharsets.UTF_8);
 	}
 }

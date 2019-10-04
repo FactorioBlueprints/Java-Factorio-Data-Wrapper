@@ -9,8 +9,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
@@ -38,8 +39,8 @@ public class DataTable {
 	private final TypeHierarchy typeHierarchy;
 	private final LuaTable rawLua;
 
-	private final JSONObject nameMappingTechnologies;
-	private final JSONObject nameMappingItemsRecipes;
+	private final ObjectNode nameMappingTechnologies;
+	private final ObjectNode nameMappingItemsRecipes;
 
 	private final Map<String, EntityPrototype> entities = new LinkedHashMap<>();
 	private final Map<String, ItemPrototype> items = new LinkedHashMap<>();
@@ -49,21 +50,21 @@ public class DataTable {
 	private final Map<String, TechPrototype> technologies = new LinkedHashMap<>();
 	private final Map<String, EquipmentPrototype> equipments = new LinkedHashMap<>();
 	private final Map<String, TilePrototype> tiles = new LinkedHashMap<>();
-	
+
 	private final Map<String, List<EntityPrototype>> craftingCategories = new LinkedHashMap<>();
 
 	private final Set<String> worldInputs = new LinkedHashSet<>();
 
-	public DataTable(TypeHierarchy typeHierarchy, LuaTable dataLua, JSONObject excludeDataJson,
-			JSONObject wikiNamingJson) {
-		this.typeHierarchy = typeHierarchy;
+	public DataTable(TypeHiearchy typeHiearchy, LuaTable dataLua, ObjectNode excludeDataJson,
+			ObjectNode wikiNamingJson) {
+		this.typeHiearchy = typeHiearchy;
 		this.rawLua = dataLua.get("raw").checktable();
 
-		Set<String> excludedRecipesAndItems = asStringSet(excludeDataJson.getJSONArray("recipes-and-items"));
-		Set<String> excludedTechnologies = asStringSet(excludeDataJson.getJSONArray("technologies"));
+		Set<String> excludedRecipesAndItems = asStringSet((ArrayNode) excludeDataJson.path("recipes-and-items"));
+		Set<String> excludedTechnologies = asStringSet((ArrayNode) excludeDataJson.path("technologies"));
 
-		nameMappingTechnologies = wikiNamingJson.getJSONObject("technologies");
-		nameMappingItemsRecipes = wikiNamingJson.getJSONObject("items and recipes");
+		nameMappingTechnologies = (ObjectNode) wikiNamingJson.path("technologies");
+		nameMappingItemsRecipes = (ObjectNode) wikiNamingJson.path("items and recipes");
 
 		Utils.forEach(rawLua, v -> {
 			Utils.forEach(v.checktable(), protoLua -> {
@@ -125,7 +126,7 @@ public class DataTable {
 						}
 					}
 				});
-		
+
 		this.entities.values().stream().filter(e -> !excludedRecipesAndItems.contains(e.getName())).forEach(e -> {
 			LuaValue categories = e.lua().get("crafting_categories");
 			if (!categories.isnil()) {
@@ -137,9 +138,9 @@ public class DataTable {
 		});
 	}
 
-	private Set<String> asStringSet(JSONArray jsonArray) {
+	private Set<String> asStringSet(ArrayNode arrayNode) {
 		Set<String> ret = new LinkedHashSet<>();
-		Utils.forEach(jsonArray, ret::add);
+		Utils.forEach(arrayNode, ret::add);
 		return ret;
 	}
 
@@ -158,7 +159,7 @@ public class DataTable {
 	public Map<String, EquipmentPrototype> getEquipments() {
 		return equipments;
 	}
-	
+
 	public Map<String, List<EntityPrototype>> getCraftingCategories() {
 		return craftingCategories;
 	}
@@ -262,8 +263,8 @@ public class DataTable {
 		return getWikiName(name, nameMappingItemsRecipes);
 	}
 
-	private String getWikiName(String name, JSONObject nameMappingJson) {
-		String ret = nameMappingJson.optString(name, null);
+	private String getWikiName(String name, ObjectNode nameMappingJson) {
+		String ret = nameMappingJson.path(name).asText(null);
 		if (ret == null) {
 			System.err.println("\"" + name + "\":\"" + getWikiDefaultName(name) + "\",");
 			nameMappingJson.put(name, ret = getWikiDefaultName(name));
@@ -284,6 +285,6 @@ public class DataTable {
 	}
 
 	public boolean hasWikiEntityName(String name) {
-		return nameMappingItemsRecipes.optString(name, null) != null;
+		return nameMappingItemsRecipes.path(name).asText(null) != null;
 	}
 }

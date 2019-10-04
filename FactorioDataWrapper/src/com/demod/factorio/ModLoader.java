@@ -19,8 +19,6 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.json.JSONException;
-
 import com.demod.factorio.ModInfo.Dependency;
 import com.google.common.io.ByteStreams;
 
@@ -35,7 +33,7 @@ public class ModLoader {
 		private final ModInfo info;
 		private final File folder;
 
-		public ModFolder(File folder) throws JSONException, FileNotFoundException, IOException {
+		public ModFolder(File folder) throws IOException {
 			this.folder = folder;
 			try (FileInputStream fis = new FileInputStream(new File(folder, "info.json"))) {
 				info = new ModInfo(Utils.readJsonFromStream(fis));

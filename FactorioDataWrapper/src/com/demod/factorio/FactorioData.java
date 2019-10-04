@@ -27,9 +27,9 @@ import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
@@ -149,33 +149,35 @@ public class FactorioData {
 		});
 	}
 
-	public static synchronized DataTable getTable() throws JSONException, IOException {
+	public static synchronized DataTable getTable() throws IOException {
 		if (dataTable == null) {
 			dataTable = initializeDataTable();
 		}
 		return dataTable;
 	}
 
-	private static DataTable initializeDataTable() throws JSONException, IOException {
+	private static DataTable initializeDataTable() throws IOException {
 		setupWorkingDirectory();
 
-		factorio = new File(Config.get().getString("factorio"));
+		JsonNode factorio = Config.get().path("factorio");
+		assert factorio.isTextual();
+		FactorioData.factorio = new File(factorio.textValue());
 
 		File[] luaFolders = new File[] { //
-				new File(factorio, "data/core/lualib"), //
+				new File(FactorioData.factorio, "data/core/lualib"), //
 				// new File(factorio, "data"), //
 				// new File(factorio, "data/core"), //
 				// new File(factorio, "data/base"), //
 		};
 
-		JSONArray modExcludeJson = Config.get().optJSONArray("mod-exclude");
+		ArrayNode modExcludeJson = (ArrayNode) Config.get().path("mod-exclude");
 		Set<String> modExclude = new HashSet<>();
 		if (modExcludeJson != null) {
 			Utils.forEach(modExcludeJson, modExclude::add);
 		}
 
 		modLoader = new ModLoader(modExclude);
-		modLoader.loadFolder(new File(factorio, "data"));
+		modLoader.loadFolder(new File(FactorioData.factorio, "data"));
 
 		File modsFolder = new File("mods");
 		if (modsFolder.exists()) {
@@ -242,9 +244,9 @@ public class FactorioData {
 		// XXX Do I need to do anything with control.lua things?
 		// http://lua-api.factorio.com/latest/Data-Lifecycle.html
 
-		JSONObject excludeDataJson = Utils
+		ObjectNode excludeDataJson = Utils
 				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("exclude-data.json"));
-		JSONObject wikiNamingJson = Utils
+		ObjectNode wikiNamingJson = Utils
 				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("wiki-naming.json"));
 		DataTable dataTable = new DataTable(typeHiearchy, globals.get("data").checktable(), excludeDataJson,
 				wikiNamingJson);

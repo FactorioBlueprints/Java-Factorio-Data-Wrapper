@@ -11,7 +11,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 
-import org.json.JSONException;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -103,7 +102,7 @@ public class FactorioXMLMain {
 	}
 
 	public static void main(String[] args)
-			throws JSONException, IOException, ParserConfigurationException, TransformerException,
+			throws IOException, ParserConfigurationException, TransformerException,
 			ClassNotFoundException, InstantiationException, IllegalAccessException, ClassCastException {
 		DataTable table = FactorioData.getTable();
 		ModInfo baseInfo = new ModInfo(

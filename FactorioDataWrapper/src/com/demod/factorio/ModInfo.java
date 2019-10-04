@@ -3,8 +3,8 @@ package com.demod.factorio;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 public class ModInfo {
 	public static class Dependency {
@@ -46,17 +46,17 @@ public class ModInfo {
 	private final String description;
 	private final List<Dependency> dependencies = new ArrayList<>();
 
-	public ModInfo(JSONObject json) {
-		name = json.getString("name");
-		version = json.optString("version", "???");
-		title = json.optString("title", "");
-		author = json.optString("author", "");
-		contact = json.optString("contact", "");
-		homepage = json.optString("homepage", "");
-		description = json.optString("description", "");
-		JSONArray dependenciesJson = json.getJSONArray("dependencies");
-		for (int i = 0; i < dependenciesJson.length(); i++) {
-			String depString = dependenciesJson.getString(i);
+	public ModInfo(JsonNode json) {
+		name = json.path("name").textValue();
+		version = json.path("version").asText("???");
+		title = json.path("title").asText("");
+		author = json.path("author").asText("");
+		contact = json.path("contact").asText("");
+		homepage = json.path("homepage").asText("");
+		description = json.path("description").asText("");
+		ArrayNode dependenciesJson = (ArrayNode) json.path("dependencies");
+		for (int i = 0; i < dependenciesJson.size(); i++) {
+			String depString = dependenciesJson.path(i).textValue();
 			String[] depSplit = depString.split("\\s");
 			if (depSplit.length == 2) {
 				dependencies.add(new Dependency(true, depSplit[1], null, null));

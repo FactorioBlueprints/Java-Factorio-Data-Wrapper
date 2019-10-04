@@ -17,10 +17,13 @@ import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
@@ -34,17 +37,18 @@ public final class Utils {
 	@SuppressWarnings("unchecked")
 	public static <T> T convertLuaToJson(LuaValue value) {
 		if (value.istable()) {
+			ObjectMapper objectMapper = new ObjectMapper();
 			if (isLuaArray(value)) {
-				JSONArray json = new JSONArray();
+				ArrayNode json = objectMapper.createArrayNode();
 				Utils.forEach(value, (v) -> {
-					json.put(Utils.<Object>convertLuaToJson(v));
+					json.add(Utils.<JsonNode>convertLuaToJson(v));
 				});
 				return (T) json;
 			} else {
-				JSONObject json = new JSONObject();
-				terribleHackToHaveOrderedJSONObject(json);
+				ObjectNode json = objectMapper.createObjectNode();
 				Utils.forEach(value, (k, v) -> {
-					json.put(k.tojstring(), Utils.<Object>convertLuaToJson(v));
+					JsonNode oldData = json.replace(k.tojstring(), Utils.<JsonNode>convertLuaToJson(v));
+					assert oldData == null;
 				});
 				return (T) json;
 			}
@@ -69,32 +73,32 @@ public final class Utils {
 		}
 	}
 
-	public static void debugPrintJson(JSONArray json) {
+	public static void debugPrintJson(ArrayNode json) {
 		debugPrintJson("", json);
 	}
 
-	public static void debugPrintJson(JSONObject json) {
+	public static void debugPrintJson(ObjectNode json) {
 		debugPrintJson("", json);
 	}
 
-	private static void debugPrintJson(String prefix, JSONArray json) {
+	private static void debugPrintJson(String prefix, ArrayNode json) {
 		forEach(json, (i, v) -> {
-			if (v instanceof JSONArray) {
-				debugPrintJson(prefix + "[" + i + "]", (JSONArray) v);
-			} else if (v instanceof JSONObject) {
-				debugPrintJson(prefix + "[" + i + "].", (JSONObject) v);
+			if (v instanceof ArrayNode) {
+				debugPrintJson(prefix + "[" + i + "]", (ArrayNode) v);
+			} else if (v instanceof ObjectNode) {
+				debugPrintJson(prefix + "[" + i + "].", (ObjectNode) v);
 			} else {
 				System.out.println(prefix + i + " = " + v);
 			}
 		});
 	}
 
-	private static void debugPrintJson(String prefix, JSONObject json) {
+	private static void debugPrintJson(String prefix, ObjectNode json) {
 		forEach(json, (k, v) -> {
-			if (v instanceof JSONArray) {
-				debugPrintJson(prefix + k, (JSONArray) v);
-			} else if (v instanceof JSONObject) {
-				debugPrintJson(prefix + k + ".", (JSONObject) v);
+			if (v instanceof ArrayNode) {
+				debugPrintJson(prefix + k, (ArrayNode) v);
+			} else if (v instanceof ObjectNode) {
+				debugPrintJson(prefix + k + ".", (ObjectNode) v);
 			} else {
 				System.out.println(prefix + k + " = " + v);
 			}
@@ -124,22 +128,23 @@ public final class Utils {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> void forEach(JSONArray jsonArray, BiConsumer<Integer, T> consumer) {
-		for (int i = 0; i < jsonArray.length(); i++) {
-			consumer.accept(i, (T) jsonArray.get(i));
+	public static <T> void forEach(ArrayNode arrayNode, BiConsumer<Integer, T> consumer) {
+		for (int i = 0; i < arrayNode.size(); i++) {
+			consumer.accept(i, (T) arrayNode.get(i));
 		}
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> void forEach(JSONArray jsonArray, Consumer<T> consumer) {
-		for (int i = 0; i < jsonArray.length(); i++) {
-			consumer.accept((T) jsonArray.get(i));
+	public static <T> void forEach(ArrayNode arrayNode, Consumer<T> consumer) {
+		for (int i = 0; i < arrayNode.size(); i++) {
+			consumer.accept((T) arrayNode.get(i));
 		}
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> void forEach(JSONObject json, Throwing.BiConsumer<String, T> consumer) {
-		json.keySet().stream().sorted()
+	public static <T> void forEach(ObjectNode json, Throwing.BiConsumer<String, T> consumer) {
+		Iterable<String> iterable = json::fieldNames;
+		StreamSupport.stream(iterable.spliterator(), false).sorted()
 				.forEach(Errors.rethrow().wrap((String k) -> consumer.accept(k, (T) json.get(k))));
 	}
 
@@ -232,8 +237,12 @@ public final class Utils {
 		return new Point(value.get(1).checkint(), value.get(2).checkint());
 	}
 
-	public static Point2D.Double parsePoint2D(JSONObject json) {
-		return new Point2D.Double(json.getDouble("x"), json.getDouble("y"));
+	public static Point2D.Double parsePoint2D(ObjectNode json) {
+		JsonNode x = json.path("x");
+		JsonNode y = json.path("y");
+		assert x.isFloatingPointNumber();
+		assert x.isFloatingPointNumber();
+		return new Point2D.Double(x.doubleValue(), y.doubleValue());
 	}
 
 	public static Point2D.Double parsePoint2D(LuaValue value) {
@@ -243,8 +252,16 @@ public final class Utils {
 		return new Point2D.Double(value.get(1).checkdouble(), value.get(2).checkdouble());
 	}
 
-	public static Rectangle parseRectangle(JSONArray json) {
-		return new Rectangle(json.getInt(0), json.getInt(1), json.getInt(2), json.getInt(3));
+	public static Rectangle parseRectangle(ArrayNode json) {
+		assert json.path(0).isIntegralNumber();
+		assert json.path(1).isIntegralNumber();
+		assert json.path(2).isIntegralNumber();
+		assert json.path(3).isIntegralNumber();
+		return new Rectangle(
+				json.path(0).intValue(),
+				json.path(1).intValue(),
+				json.path(2).intValue(),
+				json.path(3).intValue());
 	}
 
 	public static Rectangle2D.Double parseRectangle(LuaValue value) {
@@ -258,25 +275,24 @@ public final class Utils {
 		return new Rectangle2D.Double(x1, y1, x2 - x1, y2 - y1);
 	}
 
-	public static Rectangle2D.Double parseRectangle2D(JSONArray json) {
-		return new Rectangle2D.Double(json.getDouble(0), json.getDouble(1), json.getDouble(2), json.getDouble(3));
+	public static Rectangle2D.Double parseRectangle2D(ArrayNode json) {
+		assert json.path(0).isFloatingPointNumber();
+		assert json.path(1).isFloatingPointNumber();
+		assert json.path(2).isFloatingPointNumber();
+		assert json.path(3).isFloatingPointNumber();
+		return new Rectangle2D.Double(
+				json.path(0).doubleValue(),
+				json.path(1).doubleValue(),
+				json.path(2).doubleValue(),
+				json.path(3).doubleValue());
 	}
 
 	@SuppressWarnings("resource")
-	public static JSONObject readJsonFromStream(InputStream in) throws JSONException, IOException {
-		return new JSONObject(new Scanner(in, "UTF-8").useDelimiter("\\A").next());
-	}
-
-	public static void terribleHackToHaveOrderedJSONObject(JSONObject json) {
-		try {
-			Field map = json.getClass().getDeclaredField("map");
-			map.setAccessible(true);// because the field is private final...
-			map.set(json, new LinkedHashMap<>());
-			map.setAccessible(false);// return flag
-		} catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
-			e.printStackTrace();
-			System.exit(0); // Oh well...
-		}
+	public static ObjectNode readJsonFromStream(InputStream in) throws IOException {
+		Scanner scanner = new Scanner(in, "UTF-8").useDelimiter("\\A");
+		String string = scanner.next();
+		ObjectMapper objectMapper = new ObjectMapper();
+		return objectMapper.readValue(string, ObjectNode.class);
 	}
 
 	public static BufferedImage tintImage(BufferedImage image, Color tint) {
@@ -299,21 +315,23 @@ public final class Utils {
 		return ret;
 	}
 
-	public static JSONArray toJson(Rectangle rectangle) {
-		JSONArray json = new JSONArray();
-		json.put(rectangle.x);
-		json.put(rectangle.y);
-		json.put(rectangle.width);
-		json.put(rectangle.height);
+	public static ArrayNode toJson(Rectangle rectangle) {
+		ObjectMapper objectMapper = new ObjectMapper();
+		ArrayNode json = objectMapper.createArrayNode();
+		json.add(rectangle.x);
+		json.add(rectangle.y);
+		json.add(rectangle.width);
+		json.add(rectangle.height);
 		return json;
 	}
 
-	public static JSONArray toJson(Rectangle2D.Double rectangle) {
-		JSONArray json = new JSONArray();
-		json.put(rectangle.x);
-		json.put(rectangle.y);
-		json.put(rectangle.width);
-		json.put(rectangle.height);
+	public static ArrayNode toJson(Rectangle2D.Double rectangle) {
+		ObjectMapper objectMapper = new ObjectMapper();
+		ArrayNode json = objectMapper.createArrayNode();
+		json.add(rectangle.x);
+		json.add(rectangle.y);
+		json.add(rectangle.width);
+		json.add(rectangle.height);
 		return json;
 	}
 

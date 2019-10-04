@@ -1,20 +1,27 @@
 package com.demod.factorio;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Consumer;
 
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 
 public class TypeHierarchy {
 	private final Map<String, String> parents = new HashMap<>();
 	private final Set<String> roots = new LinkedHashSet<>();
 
-	public TypeHierarchy(JSONObject json) {
-		Utils.<Object>forEach(json, (t, p) -> {
-			if (p instanceof String) {
-				parents.put(t, (String) p);
+	public TypeHierarchy(ObjectNode json) {
+		json.fields().forEachRemaining(entry -> {
+			String t = entry.getKey();
+			JsonNode p = entry.getValue();
+			if (p instanceof TextNode) {
+				parents.put(t, p.textValue());
 			} else {
 				roots.add(t);
 			}

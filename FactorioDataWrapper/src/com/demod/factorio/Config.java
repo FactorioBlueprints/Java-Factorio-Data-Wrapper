@@ -3,13 +3,12 @@ package com.demod.factorio;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public final class Config {
-	private static JSONObject config = null;
+	private static ObjectNode config = null;
 
-	public static synchronized JSONObject get() {
+	public static synchronized ObjectNode get() {
 		if (config == null) {
 			loadConfig();
 		}
@@ -19,7 +18,7 @@ public final class Config {
 	private static void loadConfig() {
 		try {
 			config = Utils.readJsonFromStream(new FileInputStream("config.json"));
-		} catch (JSONException | IOException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 			System.err.println("################################");
 			System.err.println("Missing or bad config.json file!");
