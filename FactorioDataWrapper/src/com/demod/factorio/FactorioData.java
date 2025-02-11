@@ -60,8 +60,7 @@ public class FactorioData {
 			// TODO 2025-02-10: See if this line is necessary
 			pb.directory(folderFactorio);
 
-			System.out.println("Running command " + pb.command().stream().collect(Collectors.joining(",", "[", "]")));
-
+			System.out.println("Running command " + pb.command().stream().collect(Collectors.joining(" ", "[", "]")));
 			Process process = pb.start();
 
 			// Create separate threads to handle the output streams
