@@ -57,6 +57,7 @@ public class FactorioData {
 			ProcessBuilder pb = new ProcessBuilder(factorioExecutable.getAbsolutePath(),
 					"--config", fileConfig.getAbsolutePath(), "--mod-directory", folderMods.getAbsolutePath(),
 					"--dump-data");
+			// TODO 2025-02-10: See if this line is necessary
 			pb.directory(folderFactorio);
 
 			System.out.println("Running command " + pb.command().stream().collect(Collectors.joining(",", "[", "]")));
