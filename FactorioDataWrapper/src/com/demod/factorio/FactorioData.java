@@ -52,9 +52,9 @@ public class FactorioData {
 	}
 
 	@SuppressWarnings("resource")
-	public static void factorioDataDump(File folderFactorio, File fileConfig, File folderMods) {
+	public static void factorioDataDump(File folderFactorio, File factorioExecutable, File fileConfig, File folderMods) {
 		try {
-			ProcessBuilder pb = new ProcessBuilder(new File(folderFactorio, "bin/x64/factorio.exe").getAbsolutePath(),
+			ProcessBuilder pb = new ProcessBuilder(factorioExecutable.getAbsolutePath(),
 					"--config", fileConfig.getAbsolutePath(), "--mod-directory", folderMods.getAbsolutePath(),
 					"--dump-data");
 			pb.directory(folderFactorio);
@@ -85,7 +85,8 @@ public class FactorioData {
 		} catch (Exception e) {
 			System.err.println("FAILED TO DUMP DATA FROM FACTORIO INSTALL!");
 			System.err.println("\t factorio: " + folderFactorio.getAbsolutePath());
-			System.err.println("\t config: " + fileConfig.getAbsolutePath());
+			System.err.println("\t executable: " + factorioExecutable.getAbsolutePath());
+			System.out.println("\t config: " + fileConfig.getAbsolutePath());
 			System.err.println("\t mods: " + folderMods.getAbsolutePath());
 			e.printStackTrace();
 			System.exit(-1);
@@ -137,6 +138,8 @@ public class FactorioData {
 	public File folderFactorio;
 	private File folderData;
 	public File folderMods;
+
+	public File factorioExecutable;
 
 	private final JSONObject config;
 
@@ -312,6 +315,7 @@ public class FactorioData {
 //		setupWorkingDirectory();//TODO do we still need this?
 
 		folderFactorio = new File(config.getString("factorio"));
+		factorioExecutable = new File(config.getString("executable"));
 		boolean forceDumpData = config.optBoolean("force-dump-data");
 		// Setup data folder
 
@@ -373,10 +377,9 @@ public class FactorioData {
 
 		if (!fileDataRawDump.exists() || !matchingDumpStamp || forceDumpData) {
 
-			factorioDataDump(folderFactorio, fileConfig, folderMods);
+			factorioDataDump(folderFactorio, factorioExecutable, fileConfig, folderMods);
 
 			Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-
 			if (!fileDataRawDump.exists()) {
 				System.err.println("DATA DUMP FILE MISSING! " + fileDataRawDump.getAbsolutePath());
 				System.exit(-1);
