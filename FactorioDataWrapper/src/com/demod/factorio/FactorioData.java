@@ -422,7 +422,7 @@ public class FactorioData {
 		modLoader.loadFolder(folderMods);
 
 		TypeHierarchy typeHiearchy = new TypeHierarchy(Utils
-				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("type-hiearchy.json")));
+				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("type-hierarchy.json")));
 		JSONObject excludeDataJson = Utils
 				.readJsonFromStream(FactorioData.class.getClassLoader().getResourceAsStream("exclude-data.json"));
 		JSONObject includeDataJson = Utils
