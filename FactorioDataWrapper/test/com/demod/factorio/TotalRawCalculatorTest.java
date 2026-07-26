@@ -44,6 +44,44 @@ public class TotalRawCalculatorTest {
 	}
 
 	@Test
+	public void treatsIngredientsAsRawWhenTheirRecipesAreNotHandCraftable() {
+		RecipePrototype root = recipe("root", "crafting", true, 2, map("intermediate", 3), map("root", 1));
+		RecipePrototype machineRecipe = recipe("intermediate", "metallurgy", true, 5, map("ore", 4),
+				map("intermediate", 1));
+		Map<String, RecipePrototype> recipes = recipes(root, machineRecipe);
+
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting")).compute(root);
+
+		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 2.0, "intermediate", 3.0), totalRaw);
+	}
+
+	@Test
+	public void ignoresRecyclingRecipesEvenWhenTheCharacterCanCraftTheirOtherCategory() {
+		RecipePrototype root = recipe("root", "crafting", true, 1, map("intermediate", 2), map("root", 1));
+		RecipePrototype recycling = recipe("intermediate-recycling", Set.of("crafting", "recycling"), true, 1,
+				map("intermediate", 1), map("intermediate", 1));
+		RecipePrototype intermediate = recipe("intermediate", "crafting", true, 3, map("ore", 4),
+				map("intermediate", 1));
+		Map<String, RecipePrototype> recipes = recipes(root, recycling, intermediate);
+
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting")).compute(root);
+
+		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 7.0, "ore", 8.0), totalRaw);
+	}
+
+	@Test
+	public void treatsTheRepeatedIngredientAsRawWhenRecipesFormACycle() {
+		RecipePrototype root = recipe("root", "crafting", true, 1, map("first", 1), map("root", 1));
+		RecipePrototype first = recipe("first", "crafting", true, 2, map("second", 1), map("first", 1));
+		RecipePrototype second = recipe("second", "crafting", true, 3, map("first", 1), map("second", 1));
+		Map<String, RecipePrototype> recipes = recipes(root, first, second);
+
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting")).compute(root);
+
+		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 6.0, "first", 1.0), totalRaw);
+	}
+
+	@Test
 	public void treatsNutrientsAsRawDespiteDecomposableRecipes() {
 		RecipePrototype root = recipe("root", "crafting", true, 1, map("nutrients", 20), map("root", 1));
 		RecipePrototype fish = recipe("nutrients-from-fish", "crafting", true, 2, map("raw-fish", 1),
@@ -71,10 +109,15 @@ public class TotalRawCalculatorTest {
 
 	private static RecipePrototype recipe(String name, String category, boolean decomposable, double energyRequired,
 			Map<String, Integer> inputs, Map<String, Integer> outputs) {
+		return recipe(name, Set.of(category), decomposable, energyRequired, inputs, outputs);
+	}
+
+	private static RecipePrototype recipe(String name, Set<String> categories, boolean decomposable,
+			double energyRequired, Map<String, Integer> inputs, Map<String, Integer> outputs) {
 		JSONObject json = new JSONObject();
 		json.put("type", "recipe");
 		json.put("name", name);
-		json.put("category", category);
+		json.put("categories", new JSONArray(categories));
 		json.put("allow_decomposition", decomposable);
 		json.put("energy_required", energyRequired);
 		json.put("ingredients", ingredients(inputs));
