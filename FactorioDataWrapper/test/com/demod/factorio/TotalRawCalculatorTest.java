@@ -45,7 +45,7 @@ public class TotalRawCalculatorTest {
 	}
 
 	@Test
-	public void treatsIngredientsAsRawWhenTheirRecipesAreNotHandCraftable() {
+	public void decomposesIngredientsMadeByMachineOnlyRecipes() {
 		RecipePrototype root = recipe("root", "crafting", true, 2, map("intermediate", 3), map("root", 1));
 		RecipePrototype machineRecipe = recipe("intermediate", "metallurgy", true, 5, map("ore", 4),
 				map("intermediate", 1));
@@ -53,7 +53,7 @@ public class TotalRawCalculatorTest {
 
 		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
-		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 2.0, "intermediate", 3.0), totalRaw);
+		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 17.0, "ore", 12.0), totalRaw);
 	}
 
 	@Test
