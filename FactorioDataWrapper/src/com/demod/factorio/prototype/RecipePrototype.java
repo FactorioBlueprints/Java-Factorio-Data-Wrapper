@@ -81,6 +81,10 @@ public class RecipePrototype extends DataPrototype {
 		return outputs;
 	}
 
+	public boolean isHandCraftable(Set<String> characterCraftingCategories) {
+		return categories.stream().anyMatch(characterCraftingCategories::contains);
+	}
+
 	public boolean isRecycling() {
 		return recycling;
 	}

@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -24,7 +25,7 @@ public class TotalRawCalculatorTest {
 				map("intermediate", 1));
 		Map<String, RecipePrototype> recipes = recipes(root, recycling, intermediate);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting", "metallurgy")).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 7.0, "ore", 8.0), totalRaw);
 	}
@@ -37,7 +38,7 @@ public class TotalRawCalculatorTest {
 				map("asteroid-chunk", 1), map("asteroid-chunk", 1));
 		Map<String, RecipePrototype> recipes = recipes(root, crushing);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting", "crushing")).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 2.0, "asteroid-chunk", 3.0), totalRaw);
 	}
@@ -51,7 +52,7 @@ public class TotalRawCalculatorTest {
 				map("nutrients", 20));
 		Map<String, RecipePrototype> recipes = recipes(root, fish, bioflux);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting", "organic")).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 1.0, "nutrients", 20.0), totalRaw);
 	}

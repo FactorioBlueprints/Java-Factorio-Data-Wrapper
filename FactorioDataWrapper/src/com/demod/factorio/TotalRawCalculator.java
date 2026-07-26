@@ -12,9 +12,11 @@ import com.demod.factorio.prototype.RecipePrototype;
 public class TotalRawCalculator {
 	public static final String RAW_TIME = "_TIME_";
 	private final Map<String, RecipePrototype> recipes;
+	private final Set<String> characterCraftingCategories;
 
-	public TotalRawCalculator(Map<String, RecipePrototype> recipes) {
+	public TotalRawCalculator(Map<String, RecipePrototype> recipes, Set<String> characterCraftingCategories) {
 		this.recipes = recipes;
+		this.characterCraftingCategories = characterCraftingCategories;
 	}
 
 	public Map<String, Double> compute(RecipePrototype recipe) {
@@ -58,7 +60,9 @@ public class TotalRawCalculator {
 				// Factorio's allow_decomposition controls whether a recipe is expanded for the tooltip's
 				// "Total raw" calculation:
 				// https://lua-api.factorio.com/latest/prototypes/RecipePrototype.html#allow_decomposition
-				.filter(RecipePrototype::isDecomposable).filter(r -> r.getOutputs().containsKey(input))
+				.filter(RecipePrototype::isDecomposable)
+				.filter(r -> r.isHandCraftable(characterCraftingCategories))
+				.filter(r -> r.getOutputs().containsKey(input))
 				.filter(r -> !expandedRecipeNames.contains(r.getName())).findFirst();
 	}
 }
