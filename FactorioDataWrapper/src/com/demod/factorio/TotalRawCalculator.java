@@ -32,11 +32,10 @@ public class TotalRawCalculator {
 				Optional<RecipePrototype> findRecipe = recipes.values().stream()
 						// XXX the nutrients-from-fish filter is here to match the bad Factorio behavior
 						// of picking nutrients from biter eggs
-						.filter(r -> !r.getName().equals("nutrients-from-fish")).filter(RecipePrototype::isHandCraftable)
-						.filter(r -> r.getOutputs().keySet().stream().anyMatch(i -> {
-							return i.equals(input);
-						})).findFirst();
-				if (findRecipe.isPresent() && !expandedRecipeNames.contains(findRecipe.get().getName())) {
+						.filter(r -> !r.getName().equals("nutrients-from-fish")).filter(RecipePrototype::isDecomposable)
+						.filter(r -> r.getOutputs().containsKey(input))
+						.filter(r -> !expandedRecipeNames.contains(r.getName())).findFirst();
+				if (findRecipe.isPresent()) {
 					RecipePrototype inputRecipe = findRecipe.get();
 					Map<String, Double> inputTotalRaw = compute(inputRecipe, expandedRecipeNames);
 					Double inputRunYield = inputRecipe.getOutputs().get(input);
