@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.json.JSONArray;
@@ -82,7 +83,23 @@ public class TotalRawCalculatorTest {
 	}
 
 	@Test
-	public void treatsNutrientsAsRawDespiteDecomposableRecipes() {
+	public void decomposesNutrientsUsingTheLastEligibleRecipeInPrototypeOrder() {
+		RecipePrototype root = recipe("root", "crafting", true, 1, map("nutrients", 100), map("root", 1));
+		RecipePrototype fish = recipe("nutrients-from-fish", "c[nutrients-from-fish]", "crafting", true, 2,
+				map("raw-fish", 1), map("nutrients", 20));
+		RecipePrototype biterEgg = recipe("nutrients-from-biter-egg", "d[nutrients-from-biter-egg]", "crafting", true,
+				2, map("biter-egg", 1), map("nutrients", 20));
+		RecipePrototype biterEggProduction = recipe("biter-egg", "captive-spawner-process", true, 10, Map.of(),
+				map("biter-egg", 5));
+		Map<String, RecipePrototype> recipes = recipes(root, biterEgg, fish, biterEggProduction);
+
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
+
+		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 11.0, "biter-egg", 5.0), totalRaw);
+	}
+
+	@Test
+	public void decomposesNutrientsThroughFishWhenThatIsTheOnlyEligibleRecipe() {
 		RecipePrototype root = recipe("root", "crafting", true, 1, map("nutrients", 20), map("root", 1));
 		RecipePrototype fish = recipe("nutrients-from-fish", "crafting", true, 2, map("raw-fish", 1),
 				map("nutrients", 20));
@@ -92,7 +109,7 @@ public class TotalRawCalculatorTest {
 
 		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
-		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 1.0, "nutrients", 20.0), totalRaw);
+		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 3.0, "raw-fish", 1.0), totalRaw);
 	}
 
 	private static Map<String, Integer> map(String name, int amount) {
@@ -110,30 +127,47 @@ public class TotalRawCalculatorTest {
 	private static RecipePrototype recipe(String name, String category, boolean decomposable, double energyRequired,
 			Map<String, Integer> inputs, Map<String, Integer> outputs) {
 		Set<String> categories = Set.of(category);
-		return recipe(name, categories, categories.contains("crafting"), decomposable, energyRequired, inputs, outputs);
+		return recipe(name, name, categories, categories.contains("crafting"), decomposable, energyRequired, inputs,
+				outputs);
+	}
+
+	private static RecipePrototype recipe(String name, String order, String category, boolean decomposable,
+			double energyRequired, Map<String, Integer> inputs, Map<String, Integer> outputs) {
+		Set<String> categories = Set.of(category);
+		return recipe(name, order, categories, categories.contains("crafting"), decomposable, energyRequired, inputs,
+				outputs);
 	}
 
 	private static RecipePrototype recipe(String name, Set<String> categories, boolean decomposable,
 			double energyRequired, Map<String, Integer> inputs, Map<String, Integer> outputs) {
-		return recipe(name, categories, categories.contains("crafting"), decomposable, energyRequired, inputs, outputs);
+		return recipe(name, name, categories, categories.contains("crafting"), decomposable, energyRequired, inputs,
+				outputs);
 	}
 
 	private static RecipePrototype recipe(String name, Set<String> categories, boolean handCraftable,
 			boolean decomposable, double energyRequired, Map<String, Integer> inputs, Map<String, Integer> outputs) {
+		return recipe(name, name, categories, handCraftable, decomposable, energyRequired, inputs, outputs);
+	}
+
+	private static RecipePrototype recipe(String name, String order, Set<String> categories, boolean handCraftable,
+			boolean decomposable, double energyRequired, Map<String, Integer> inputs, Map<String, Integer> outputs) {
 		JSONObject json = new JSONObject();
 		json.put("type", "recipe");
 		json.put("name", name);
+		json.put("order", order);
 		json.put("categories", new JSONArray(categories));
 		json.put("allow_decomposition", decomposable);
 		json.put("energy_required", energyRequired);
 		json.put("ingredients", ingredients(inputs));
 		json.put("results", results(outputs));
-		return new RecipePrototype(new LuaTable(json)) {
+		RecipePrototype recipe = new RecipePrototype(new LuaTable(json)) {
 			@Override
 			public boolean isHandCraftable() {
 				return handCraftable;
 			}
 		};
+		recipe.setGroup(Optional.empty());
+		return recipe;
 	}
 
 	private static JSONArray ingredients(Map<String, Integer> inputs) {
