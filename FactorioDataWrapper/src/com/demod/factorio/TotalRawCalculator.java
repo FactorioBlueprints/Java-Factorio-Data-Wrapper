@@ -29,15 +29,7 @@ public class TotalRawCalculator {
 		try {
 			for (Entry<String, Integer> entry : recipe.getInputs().entrySet()) {
 				String input = entry.getKey();
-				Optional<RecipePrototype> findRecipe = recipes.values().stream()
-						// Factorio prefers nutrients-from-biter-egg over nutrients-from-fish for Total raw.
-						.filter(r -> !r.getName().equals("nutrients-from-fish"))
-						// Factorio's allow_decomposition controls whether a recipe is expanded for the tooltip's
-						// "Total raw" calculation:
-						// https://lua-api.factorio.com/latest/prototypes/RecipePrototype.html#allow_decomposition
-						.filter(RecipePrototype::isDecomposable)
-						.filter(r -> r.getOutputs().containsKey(input))
-						.filter(r -> !expandedRecipeNames.contains(r.getName())).findFirst();
+				Optional<RecipePrototype> findRecipe = findRecipe(input, expandedRecipeNames);
 				if (findRecipe.isPresent()) {
 					RecipePrototype inputRecipe = findRecipe.get();
 					Map<String, Double> inputTotalRaw = compute(inputRecipe, expandedRecipeNames);
@@ -55,5 +47,18 @@ public class TotalRawCalculator {
 		}
 
 		return totalRaw;
+	}
+
+	private Optional<RecipePrototype> findRecipe(String input, Set<String> expandedRecipeNames) {
+		// Nutrients have several context-dependent production recipes, so no one recipe is canonical.
+		if (input.equals("nutrients")) {
+			return Optional.empty();
+		}
+		return recipes.values().stream()
+				// Factorio's allow_decomposition controls whether a recipe is expanded for the tooltip's
+				// "Total raw" calculation:
+				// https://lua-api.factorio.com/latest/prototypes/RecipePrototype.html#allow_decomposition
+				.filter(RecipePrototype::isDecomposable).filter(r -> r.getOutputs().containsKey(input))
+				.filter(r -> !expandedRecipeNames.contains(r.getName())).findFirst();
 	}
 }

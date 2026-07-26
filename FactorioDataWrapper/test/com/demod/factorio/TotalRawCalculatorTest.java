@@ -43,17 +43,17 @@ public class TotalRawCalculatorTest {
 	}
 
 	@Test
-	public void prefersNutrientsFromBiterEggsOverNutrientsFromFish() {
+	public void treatsNutrientsAsRawDespiteDecomposableRecipes() {
 		RecipePrototype root = recipe("root", "crafting", true, 1, map("nutrients", 20), map("root", 1));
 		RecipePrototype fish = recipe("nutrients-from-fish", "crafting", true, 2, map("raw-fish", 1),
 				map("nutrients", 20));
-		RecipePrototype biterEgg = recipe("nutrients-from-biter-egg", "crafting", true, 3, map("biter-egg", 1),
+		RecipePrototype bioflux = recipe("nutrients-from-bioflux", "organic", true, 3, map("bioflux", 5),
 				map("nutrients", 20));
-		Map<String, RecipePrototype> recipes = recipes(root, fish, biterEgg);
+		Map<String, RecipePrototype> recipes = recipes(root, fish, bioflux);
 
 		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
-		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 4.0, "biter-egg", 1.0), totalRaw);
+		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 1.0, "nutrients", 20.0), totalRaw);
 	}
 
 	private static Map<String, Integer> map(String name, int amount) {
