@@ -30,9 +30,12 @@ public class TotalRawCalculator {
 			for (Entry<String, Integer> entry : recipe.getInputs().entrySet()) {
 				String input = entry.getKey();
 				Optional<RecipePrototype> findRecipe = recipes.values().stream()
-						// XXX the nutrients-from-fish filter is here to match the bad Factorio behavior
-						// of picking nutrients from biter eggs
-						.filter(r -> !r.getName().equals("nutrients-from-fish")).filter(RecipePrototype::isDecomposable)
+						// Factorio prefers nutrients-from-biter-egg over nutrients-from-fish for Total raw.
+						.filter(r -> !r.getName().equals("nutrients-from-fish"))
+						// Factorio's allow_decomposition controls whether a recipe is expanded for the tooltip's
+						// "Total raw" calculation:
+						// https://lua-api.factorio.com/latest/prototypes/RecipePrototype.html#allow_decomposition
+						.filter(RecipePrototype::isDecomposable)
 						.filter(r -> r.getOutputs().containsKey(input))
 						.filter(r -> !expandedRecipeNames.contains(r.getName())).findFirst();
 				if (findRecipe.isPresent()) {
