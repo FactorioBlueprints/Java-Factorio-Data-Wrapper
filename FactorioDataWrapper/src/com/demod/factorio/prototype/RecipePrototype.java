@@ -18,7 +18,6 @@ public class RecipePrototype extends DataPrototype {
 	private final Map<String, Integer> inputs = new LinkedHashMap<>();
 	private final Map<String, Double> outputs = new LinkedHashMap<>();
 	private final double energyRequired;
-	private final boolean handCraftable;
 	private final boolean recycling;
 
 	public RecipePrototype(LuaTable lua) {
@@ -57,8 +56,6 @@ public class RecipePrototype extends DataPrototype {
 			Utils.forEach(categoriesLua.checktable(), categoryLua -> categories.add(categoryLua.tojstring()));
 		}
 		category = categories.iterator().next();
-		// FIXME get these from the character prototype
-		handCraftable = categories.contains("crafting") || categories.contains("hand-crafting");
 		recycling = categories.contains("recycling");
 	}
 
@@ -78,8 +75,8 @@ public class RecipePrototype extends DataPrototype {
 		return outputs;
 	}
 
-	public boolean isHandCraftable() {
-		return handCraftable;
+	public boolean isHandCraftable(Set<String> characterCraftingCategories) {
+		return categories.stream().anyMatch(characterCraftingCategories::contains);
 	}
 
 	public boolean isRecycling() {
@@ -89,7 +86,7 @@ public class RecipePrototype extends DataPrototype {
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Recipe: " + getName() + (!isHandCraftable() ? " (MACHINE ONLY)" : "") + "\n");
+		sb.append("Recipe: " + getName() + "\n");
 		sb.append("\tTIME " + getEnergyRequired() + "\n");
 		getInputs().forEach((k, v) -> {
 			sb.append("\tIN " + k + " " + v + "\n");
