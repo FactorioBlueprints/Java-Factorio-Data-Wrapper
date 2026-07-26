@@ -518,8 +518,7 @@ public class FactorioWikiMain {
 		JSONObject json = createOrderedJSONObject();
 
 		Map<String, RecipePrototype> normalRecipes = table.getRecipes();
-		TotalRawCalculator normalTotalRawCalculator = new TotalRawCalculator(normalRecipes,
-				table.getCharacterCraftingCategories());
+		TotalRawCalculator normalTotalRawCalculator = new TotalRawCalculator(normalRecipes);
 
 		normalRecipes.values().stream().filter(r -> !r.isRecycling())
 				.sorted((r1, r2) -> r1.getName().compareTo(r2.getName())).forEach(recipe -> {

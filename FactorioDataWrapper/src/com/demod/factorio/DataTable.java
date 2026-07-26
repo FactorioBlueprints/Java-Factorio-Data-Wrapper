@@ -118,6 +118,12 @@ public class DataTable {
 			});
 		});
 
+		LuaValue characterCraftingCategoriesLua = entities.get("character").lua().get("crafting_categories");
+		if (!characterCraftingCategoriesLua.isnil()) {
+			Utils.forEach(characterCraftingCategoriesLua.checktable(),
+					categoryLua -> characterCraftingCategories.add(categoryLua.tojstring()));
+		}
+
 		for (Map<String, ? extends DataPrototype> protos : Arrays.asList(items, recipes, entities, fluids, technologies,
 				equipments, tiles, achievements, itemGroups, itemSubGroups)) {
 			protos.values().forEach(p -> {
@@ -134,12 +140,6 @@ public class DataTable {
 					}
 				}
 			});
-		}
-
-		LuaValue characterCraftingCategoriesLua = entities.get("character").lua().get("crafting_categories");
-		if (!characterCraftingCategoriesLua.isnil()) {
-			Utils.forEach(characterCraftingCategoriesLua.checktable(),
-					categoryLua -> characterCraftingCategories.add(categoryLua.tojstring()));
 		}
 
 		for (ItemPrototype item : items.values()) {
