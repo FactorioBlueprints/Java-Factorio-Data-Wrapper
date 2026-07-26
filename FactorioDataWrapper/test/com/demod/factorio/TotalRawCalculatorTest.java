@@ -21,11 +21,11 @@ public class TotalRawCalculatorTest {
 				map("root", 1));
 		RecipePrototype recycling = recipe("intermediate-recycling", "recycling", false, 1,
 				map("intermediate", 1), map("intermediate", 1));
-		RecipePrototype intermediate = recipe("intermediate", "metallurgy", true, 3, map("ore", 4),
+		RecipePrototype intermediate = recipe("intermediate", Set.of("metallurgy"), true, true, 3, map("ore", 4),
 				map("intermediate", 1));
 		Map<String, RecipePrototype> recipes = recipes(root, recycling, intermediate);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting", "metallurgy")).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 7.0, "ore", 8.0), totalRaw);
 	}
@@ -38,7 +38,7 @@ public class TotalRawCalculatorTest {
 				map("asteroid-chunk", 1), map("asteroid-chunk", 1));
 		Map<String, RecipePrototype> recipes = recipes(root, crushing);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting", "crushing")).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 2.0, "asteroid-chunk", 3.0), totalRaw);
 	}
@@ -50,7 +50,7 @@ public class TotalRawCalculatorTest {
 				map("intermediate", 1));
 		Map<String, RecipePrototype> recipes = recipes(root, machineRecipe);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting")).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 2.0, "intermediate", 3.0), totalRaw);
 	}
@@ -64,7 +64,7 @@ public class TotalRawCalculatorTest {
 				map("intermediate", 1));
 		Map<String, RecipePrototype> recipes = recipes(root, recycling, intermediate);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting")).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 7.0, "ore", 8.0), totalRaw);
 	}
@@ -76,7 +76,7 @@ public class TotalRawCalculatorTest {
 		RecipePrototype second = recipe("second", "crafting", true, 3, map("first", 1), map("second", 1));
 		Map<String, RecipePrototype> recipes = recipes(root, first, second);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting")).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 6.0, "first", 1.0), totalRaw);
 	}
@@ -90,7 +90,7 @@ public class TotalRawCalculatorTest {
 				map("nutrients", 20));
 		Map<String, RecipePrototype> recipes = recipes(root, fish, bioflux);
 
-		Map<String, Double> totalRaw = new TotalRawCalculator(recipes, Set.of("crafting", "organic")).compute(root);
+		Map<String, Double> totalRaw = new TotalRawCalculator(recipes).compute(root);
 
 		assertEquals(Map.of(TotalRawCalculator.RAW_TIME, 1.0, "nutrients", 20.0), totalRaw);
 	}
@@ -109,11 +109,17 @@ public class TotalRawCalculatorTest {
 
 	private static RecipePrototype recipe(String name, String category, boolean decomposable, double energyRequired,
 			Map<String, Integer> inputs, Map<String, Integer> outputs) {
-		return recipe(name, Set.of(category), decomposable, energyRequired, inputs, outputs);
+		Set<String> categories = Set.of(category);
+		return recipe(name, categories, categories.contains("crafting"), decomposable, energyRequired, inputs, outputs);
 	}
 
 	private static RecipePrototype recipe(String name, Set<String> categories, boolean decomposable,
 			double energyRequired, Map<String, Integer> inputs, Map<String, Integer> outputs) {
+		return recipe(name, categories, categories.contains("crafting"), decomposable, energyRequired, inputs, outputs);
+	}
+
+	private static RecipePrototype recipe(String name, Set<String> categories, boolean handCraftable,
+			boolean decomposable, double energyRequired, Map<String, Integer> inputs, Map<String, Integer> outputs) {
 		JSONObject json = new JSONObject();
 		json.put("type", "recipe");
 		json.put("name", name);
@@ -122,7 +128,12 @@ public class TotalRawCalculatorTest {
 		json.put("energy_required", energyRequired);
 		json.put("ingredients", ingredients(inputs));
 		json.put("results", results(outputs));
-		return new RecipePrototype(new LuaTable(json));
+		return new RecipePrototype(new LuaTable(json)) {
+			@Override
+			public boolean isHandCraftable() {
+				return handCraftable;
+			}
+		};
 	}
 
 	private static JSONArray ingredients(Map<String, Integer> inputs) {

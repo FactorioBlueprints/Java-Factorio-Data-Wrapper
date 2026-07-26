@@ -7,6 +7,7 @@ import java.util.Set;
 
 import org.json.JSONArray;
 
+import com.demod.factorio.DataTable;
 import com.demod.factorio.Utils;
 import com.demod.factorio.fakelua.LuaTable;
 import com.demod.factorio.fakelua.LuaValue;
@@ -19,6 +20,7 @@ public class RecipePrototype extends DataPrototype {
 	private final Map<String, Double> outputs = new LinkedHashMap<>();
 	private final boolean decomposable;
 	private final double energyRequired;
+	private boolean handCraftable;
 	private final boolean recycling;
 
 	public RecipePrototype(LuaTable lua) {
@@ -81,8 +83,8 @@ public class RecipePrototype extends DataPrototype {
 		return outputs;
 	}
 
-	public boolean isHandCraftable(Set<String> characterCraftingCategories) {
-		return categories.stream().anyMatch(characterCraftingCategories::contains);
+	public boolean isHandCraftable() {
+		return handCraftable;
 	}
 
 	public boolean isRecycling() {
@@ -90,9 +92,15 @@ public class RecipePrototype extends DataPrototype {
 	}
 
 	@Override
+	public void setTable(DataTable table) {
+		super.setTable(table);
+		handCraftable = categories.stream().anyMatch(table.getCharacterCraftingCategories()::contains);
+	}
+
+	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Recipe: " + getName() + "\n");
+		sb.append("Recipe: " + getName() + (!isHandCraftable() ? " (MACHINE ONLY)" : "") + "\n");
 		sb.append("\tTIME " + getEnergyRequired() + "\n");
 		getInputs().forEach((k, v) -> {
 			sb.append("\tIN " + k + " " + v + "\n");
