@@ -55,7 +55,8 @@ public class TotalRawCalculator {
 				// "Total raw" calculation:
 				// https://lua-api.factorio.com/latest/prototypes/RecipePrototype.html#allow_decomposition
 				.filter(RecipePrototype::isDecomposable)
-				.filter(r -> !r.isRecycling() && !r.getInputs().isEmpty())
+				.filter(RecipePrototype::isHandCraftable)
+				.filter(r -> !r.isRecycling())
 				.filter(r -> r.getOutputs().containsKey(input))
 				.max(RecipePrototype::compareTo);
 	}
