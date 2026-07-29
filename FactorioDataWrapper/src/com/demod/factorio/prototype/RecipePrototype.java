@@ -18,6 +18,7 @@ public class RecipePrototype extends DataPrototype {
 	private final Set<String> categories = new LinkedHashSet<>();
 	private final Map<String, Integer> inputs = new LinkedHashMap<>();
 	private final Map<String, Double> outputs = new LinkedHashMap<>();
+	private final boolean decomposable;
 	private final double energyRequired;
 	private boolean handCraftable;
 	private final boolean recycling;
@@ -51,6 +52,7 @@ public class RecipePrototype extends DataPrototype {
 		}
 
 		energyRequired = lua.get("energy_required").optdouble(0.5);
+		decomposable = lua.get("allow_decomposition").optboolean(true);
 		LuaValue categoriesLua = lua.get("categories");
 		if (categoriesLua.isnil()) {
 			categories.add(lua.get("category").optjstring("crafting"));
@@ -63,6 +65,10 @@ public class RecipePrototype extends DataPrototype {
 
 	public String getCategory() {
 		return category;
+	}
+
+	public boolean isDecomposable() {
+		return decomposable;
 	}
 
 	public double getEnergyRequired() {

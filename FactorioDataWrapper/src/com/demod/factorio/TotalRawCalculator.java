@@ -29,14 +29,7 @@ public class TotalRawCalculator {
 		try {
 			for (Entry<String, Integer> entry : recipe.getInputs().entrySet()) {
 				String input = entry.getKey();
-				Optional<RecipePrototype> findRecipe = recipes.values().stream()
-						// XXX the nutrients-from-fish filter is here to match the bad Factorio behavior
-						// of picking nutrients from biter eggs
-						.filter(r -> !r.getName().equals("nutrients-from-fish"))
-						.filter(RecipePrototype::isHandCraftable)
-						.filter(r -> r.getOutputs().keySet().stream().anyMatch(i -> {
-							return i.equals(input);
-						})).findFirst();
+				Optional<RecipePrototype> findRecipe = findRecipe(input);
 				if (findRecipe.isPresent() && !expandedRecipeNames.contains(findRecipe.get().getName())) {
 					RecipePrototype inputRecipe = findRecipe.get();
 					Map<String, Double> inputTotalRaw = compute(inputRecipe, expandedRecipeNames);
@@ -54,5 +47,17 @@ public class TotalRawCalculator {
 		}
 
 		return totalRaw;
+	}
+
+	private Optional<RecipePrototype> findRecipe(String input) {
+		return recipes.values().stream()
+				// Factorio's allow_decomposition controls whether a recipe is expanded for the tooltip's
+				// "Total raw" calculation:
+				// https://lua-api.factorio.com/latest/prototypes/RecipePrototype.html#allow_decomposition
+				.filter(RecipePrototype::isDecomposable)
+				.filter(RecipePrototype::isHandCraftable)
+				.filter(r -> !r.isRecycling())
+				.filter(r -> r.getOutputs().containsKey(input))
+				.max(RecipePrototype::compareTo);
 	}
 }
